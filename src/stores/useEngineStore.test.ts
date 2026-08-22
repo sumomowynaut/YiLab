@@ -142,4 +142,37 @@ describe("useEngineStore", () => {
     expect(useEngineStore.getState().status).toBe("crashed");
     expect(useEngineStore.getState().message).toContain("崩溃");
   });
+
+  it("persists engine settings to localStorage and restores on init", async () => {
+    localStorage.removeItem("pikaxiangqi-engine-settings");
+    useEngineStore.getState().init(makeEngineApi(), makeBoardApi());
+    await useEngineStore.getState().applySettings({ threads: 4, hash: 64, depth: 10, multipv: 3 });
+
+    const stored = JSON.parse(localStorage.getItem("pikaxiangqi-engine-settings") ?? "{}");
+    expect(stored).toMatchObject({ threads: 4, hash: 64, depth: 10, multipv: 3 });
+
+    // 模拟重启：重置 store 后 init 应恢复已保存设置
+    useEngineStore.setState({
+      settings: { programPath: "", threads: 1, hash: 16, depth: null, multipv: 1 },
+    });
+    useEngineStore.getState().init(makeEngineApi(), makeBoardApi());
+    expect(useEngineStore.getState().settings).toMatchObject({
+      threads: 4,
+      hash: 64,
+      depth: 10,
+      multipv: 3,
+    });
+  });
+
+  it("falls back to defaults when stored settings are corrupted", async () => {
+    localStorage.setItem("pikaxiangqi-engine-settings", "not-json");
+    useEngineStore.getState().init(makeEngineApi(), makeBoardApi());
+    expect(useEngineStore.getState().settings).toEqual({
+      programPath: "",
+      threads: 1,
+      hash: 16,
+      depth: null,
+      multipv: 1,
+    });
+  });
 });

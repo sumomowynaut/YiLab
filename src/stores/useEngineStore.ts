@@ -15,6 +15,8 @@ export interface EngineSettings {
 
 let cleanupSubscription: (() => void) | null = null;
 
+const SETTINGS_KEY = "pikaxiangqi-engine-settings";
+
 const DEFAULT_SETTINGS: EngineSettings = {
   programPath: "",
   threads: 1,
@@ -22,6 +24,39 @@ const DEFAULT_SETTINGS: EngineSettings = {
   depth: null,
   multipv: 1,
 };
+
+const MULTIPV_OPTIONS = [1, 2, 3, 5, 10];
+
+function loadSettings(): EngineSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) {
+      return DEFAULT_SETTINGS;
+    }
+    const p = JSON.parse(raw) as Partial<EngineSettings>;
+    return {
+      programPath: typeof p.programPath === "string" ? p.programPath : DEFAULT_SETTINGS.programPath,
+      threads:
+        typeof p.threads === "number" && p.threads > 0 ? p.threads : DEFAULT_SETTINGS.threads,
+      hash: typeof p.hash === "number" && p.hash > 0 ? p.hash : DEFAULT_SETTINGS.hash,
+      depth: p.depth === null || typeof p.depth === "number" ? p.depth : DEFAULT_SETTINGS.depth,
+      multipv:
+        typeof p.multipv === "number" && MULTIPV_OPTIONS.includes(p.multipv)
+          ? p.multipv
+          : DEFAULT_SETTINGS.multipv,
+    };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+function saveSettings(settings: EngineSettings): void {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    // localStorage 不可用时静默忽略
+  }
+}
 
 interface EngineState {
   api: EngineApi | null;
@@ -105,7 +140,7 @@ export const useEngineStore = create<EngineState>((set, get) => ({
         set(patch);
       }
     });
-    set({ api, boardApi });
+    set({ api, boardApi, settings: loadSettings() });
   },
 
   async start() {
@@ -149,6 +184,7 @@ export const useEngineStore = create<EngineState>((set, get) => ({
     const { api, settings } = get();
     const next = { ...settings, ...patch };
     set({ settings: next });
+    saveSettings(next);
     if (!api) return;
     try {
       await api.setOption("Threads", String(next.threads));
