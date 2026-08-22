@@ -19,11 +19,11 @@
 | 5 | Game Tree | 棋谱树数据模型与持久化 | P0 | 2 | Done | Rust 24 集成测试 + 前端 store/MoveTree 测试 | 棋盘数据模型 | 真实树结构；JSON 持久化待 Phase 4（DB） |
 | 6 | 主线 | 沿第一子节点走主线，主线导航 | P0 | 2 | Done | main_line 测试 + ←/→ 导航测试 | Game Tree | children[0] 为主线 |
 | 7 | 多变例 | 增/删/提/换序变例，切换显示 | P0 | 2 | Done | 变例/嵌套变例测试 + MoveTree 展开/删除测试 | Game Tree | 增/删/嵌套已实现；提/换序待 Phase 4 |
-| 8 | 棋谱注释 | 节点注释与 NAG（?! 等）编辑 | P1 | 2 | Not Started | 注释编辑测试 | Game Tree | 有注释着法标记「*」 |
-| 9 | 本地 Pikafish | 定位/捆绑本地引擎二进制并启动 | P0 | 3 | Not Started | 引擎 spawn/握手集成测试 | Engine Manager、许可决策 | 工作目录解析 NNUE |
-| 10 | UCI | UCI 协议实现（命令编解码 + info 解析） | P0 | 3 | Not Started | UCI 解析 Fixture 测试 | Engine Manager | UCI-Cyclone 坐标 |
-| 11 | MultiPV | 多主变分析展示 | P1 | 3 | Not Started | MultiPV 集成测试 | UCI、引擎参数 | 默认关闭，上限运行时读取 |
-| 12 | 引擎参数 | Threads/Hash/MultiPV 等选项读写与持久化 | P1 | 3 | Not Started | setoption 往返测试 | UCI | 高级选项透传 |
+| 8 | 棋谱注释 | 节点注释与 NAG（?! 等）编辑 | P1 | 2 | Done | store 注释/NAG 编辑测试 + MoveTree 注释标记测试 | Game Tree | 注释编辑区 + NAG 按钮 + 有注释着法标记「*」 |
+| 9 | 本地 Pikafish | 定位/捆绑本地引擎二进制并启动 | P0 | 3 | In Progress | 引擎 spawn/握手集成测试（含真实 Pikafish 冒烟，默认 ignore） | Engine Manager、许可决策 | 定位/启动/握手完成；捆绑分发受许可决策阻塞（见 licensing.md） |
+| 10 | UCI | UCI 协议实现（命令编解码 + info 解析） | P0 | 3 | Done | UCI 编解码单元测试 + Engine Manager 集成测试 | Engine Manager | UCI-Cyclone 坐标；info/bestmove/option 解析 |
+| 11 | MultiPV | 多主变分析展示 | P1 | 3 | Done | AnalysisPanel MultiPV 渲染/切换测试 + 引擎 MultiPV 集成 | UCI、引擎参数 | 支持 1/2/3/5/10；MultiPV 行内并行渲染 |
+| 12 | 引擎参数 | Threads/Hash/MultiPV 等选项读写与持久化 | P1 | 3 | In Progress | setoption 往返测试 + 参数面板测试 | UCI | 读写/UI（Threads/Hash/Depth/MultiPV）完成；持久化待实现 |
 | 13 | 棋谱导入导出 | 通用导入导出框架 + 文件/粘贴/复制入口 | P0 | 2 | Not Started | 框架 + 往返测试 | 各格式适配器 | FEN/PGN/TXT 先行 |
 | 14 | XQF | XQF 二进制导入导出 | P1 | 4 | Not Started | 往返 + 样本库 | 格式调研（NEEDS_VERIFICATION） | 先导出后导入 |
 | 15 | PGN | 中国象棋 PGN 导入导出（变例/注释） | P0 | 2 | Done | 往返语义等价（8 集成 + 7 单元用例） | 导入导出框架 | UCI-Cyclone 记谱；中文纵线制导入不支持（NEEDS_VERIFICATION） |
