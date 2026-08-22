@@ -1,17 +1,37 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
+import { useBoardStore } from "./stores/useBoardStore";
+
+beforeEach(() => {
+  useBoardStore.setState({
+    api: null,
+    position: null,
+    validation: null,
+    selected: null,
+    legalTargets: [],
+    editing: false,
+    tool: null,
+    view: { flipVertical: false, flipHorizontal: false },
+    message: null,
+    loading: false,
+  });
+});
 
 describe("App", () => {
-  it("renders the project shell", () => {
+  it("renders the board with the start position", async () => {
     render(<App />);
-    expect(screen.getByText("PikaXiangqi")).toBeInTheDocument();
+    expect(await screen.findByText("PikaXiangqi")).toBeInTheDocument();
+    expect(screen.getByText("帅")).toBeInTheDocument();
+    expect(screen.getByText("红方")).toBeInTheDocument();
   });
 
-  it("increments the Zustand counter", () => {
+  it("toggles the position editor and shows the palette", async () => {
     render(<App />);
-    const button = screen.getByRole("button", { name: /计数 0/ });
-    fireEvent.click(button);
-    expect(screen.getByRole("button", { name: /计数 1/ })).toBeInTheDocument();
+    await screen.findByText("帅");
+    fireEvent.click(screen.getByRole("button", { name: "编辑局面" }));
+    expect(screen.getByTestId("palette")).toBeInTheDocument();
+    expect(screen.getByTestId("palette-red-king")).toBeInTheDocument();
+    expect(screen.getByTestId("palette-eraser")).toBeInTheDocument();
   });
 });

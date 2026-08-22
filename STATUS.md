@@ -5,28 +5,33 @@
 
 ## 当前阶段
 
-**Phase 0（Project Bootstrap）✅ 完成**
+**Phase 1（Board Core 棋盘核心）✅ 棋盘核心完成**
 
-- ✅ 架构文档集：`docs/`（产品规格、架构、数据模型、引擎、导入导出、开局库、OCR、测试、许可、开发计划、功能矩阵）。
-- ✅ 可运行项目骨架：Tauri 2 + React 19 + TypeScript + Rust + Tailwind CSS 4 + shadcn/ui（Button/Card）+ Zustand。
-- ✅ 基础测试：Vitest + React Testing Library（5 个用例通过）、Rust 单元测试（2 个用例通过）。
-- ✅ 工具链：ESLint 9（flat config）、Prettier、rustfmt、clippy、husky + lint-staged（pre-commit）。
-- ✅ 基础 CI：`.github/workflows/ci.yml`（windows-latest，前端 + Rust 全量检查）。
-- ⛔ 尚未开始：任何象棋业务功能（Phase 1+）。
+- ✅ Rust 棋盘核心 `src-tauri/src/board/`：类型（Color/Piece/Square/Move/Position）、规则引擎
+  （走法生成/合法性/将军/将死/困毙/飞将/perft）、FEN 解析与序列化、局面校验、180°旋转与左右镜像。
+- ✅ Rust 单元测试 **52 个**全部通过，覆盖：将军、将军应对、将死、吃子、特殊规则（无升变/飞将/困毙）、
+  炮（炮架）、马腿、象眼、士（九宫）、将（九宫）、车、兵/卒、河界、九宫、FEN、局面校验、旋转/镜像、坐标、perft。
+- ✅ perft 对拍：起始局面 perft(1)=44 / perft(2)=1,920 / perft(3)=79,666（参考 Chess Programming Wiki）。
+- ✅ Tauri 命令：`board_startpos / board_from_fen / board_legal_moves / board_make_move / board_validate /
+  board_rotate / board_edit_set_piece / board_edit_clear / board_edit_set_side / board_edit_clear_all`。
+- ✅ React Board UI：SVG 棋盘（10×9、九宫斜线、楚河汉界）、棋子渲染、选中与合法落点提示、
+  走子（经 Rust 校验）、翻转棋盘/左右镜像视图、局面编辑器（棋子面板/橡皮/清空/切换先手方/FEN 载入）、校验结果展示。
+- ✅ 前端测试 **15 个**全部通过（notation、Board 组件、App、utils）。
+- ⛔ 尚未实现：棋谱树/变例（Phase 2）、Pikafish 引擎（Phase 3）、开局库/OCR（Phase 4/5）等。
 
 ## 验收命令（全部通过）
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `npm install` | ✅ | 341 个包，含 esbuild postinstall 已批准 |
-| `npm run build` | ✅ | tsc + vite build |
-| `npm run test` | ✅ | 2 个测试文件 / 5 个用例 |
-| `npm run lint` | ✅ | ESLint 0 error 0 warning |
-| `npm run format:check` | ✅ | Prettier 全绿 |
-| `cargo check` | ✅ | 见下方环境说明 |
-| `cargo test` | ✅ | 2 个用例通过 |
-| `cargo fmt --check` | ✅ | |
+| `cargo test` | ✅ | 52 个 Rust 用例 |
 | `cargo clippy -- -D warnings` | ✅ | |
+| `cargo fmt --check` | ✅ | |
+| `cargo check` | ✅ | |
+| `npm run test` | ✅ | 15 个前端用例 |
+| `npm run lint` | ✅ | 0 error 0 warning |
+| `npm run format:check` | ✅ | |
+| `npm run build` | ✅ | tsc + vite build |
+| `npm run check` | ✅ | tsc --noEmit |
 
 ## 本机（沙箱）环境说明
 
@@ -36,6 +41,7 @@
 - 正式开发机与 CI（`windows-latest`，MSVC toolchain，ASCII 路径）无需该变通。
 - `npm` 由沙箱内置 pnpm 全局安装（npm 12）；正常开发机自带 npm 即可。
 - 依赖镜像：本机验证使用 npmmirror（npm）与 rsproxy（crates.io）；CI 使用默认源。
+- 浏览器 `npm run dev` 使用内存回退 API（仅展示起始局面）；走子/编辑需在 Tauri 环境运行（Rust 规则核心）。
 
 ## 状态图例
 
@@ -49,9 +55,10 @@
 
 `docs/feature-matrix.md` 中的 `Status` 使用同一图例的文字形式。
 
-## 下一步（进入 Phase 1）
+## 下一步（Phase 1 收尾 / Phase 2）
 
-按 `docs/development-plan.md` 的 Phase 1 实现核心棋盘与规则：棋盘渲染、走法生成与合法性、FEN、perft 对拍。
+1. Phase 1 收尾：深浅色主题切换（feature-matrix #25/#26）。
+2. Phase 2：棋谱树 Game Tree（主线/变例/注释）+ PGN/TXT 导入导出 + 局面编辑器完善。
 
 ## 关键开放问题（NEEDS_VERIFICATION）
 
@@ -69,3 +76,4 @@
 |------|------|
 | 2026-08-22 | 建立架构文档集、AGENTS.md、STATUS.md、feature-matrix.md；确认 Phase 0 前状态 |
 | 2026-08-22 | Phase 0 完成：Tauri 2 + React/TS + Rust 骨架、Tailwind/shadcn/ui、Zustand、测试、ESLint/Prettier/rustfmt、husky、基础 CI；提交 `chore: bootstrap project` |
+| 2026-08-22 | Phase 1 棋盘核心完成：Rust 规则引擎（52 测试，perft 对拍 44/1920/79666）、FEN、校验、旋转；React 棋盘 UI + 局面编辑器；提交 `feat: implement xiangqi board core` |

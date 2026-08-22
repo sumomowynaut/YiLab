@@ -1,5 +1,8 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
+pub mod board;
+mod commands;
+
 /// 返回应用版本（来自 Cargo.toml）。
 #[tauri::command]
 fn version() -> String {
@@ -16,7 +19,21 @@ fn greet(name: &str) -> String {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![version, greet])
+        .invoke_handler(tauri::generate_handler![
+            version,
+            greet,
+            commands::board_startpos,
+            commands::board_from_fen,
+            commands::board_legal_moves,
+            commands::board_make_move,
+            commands::board_validate,
+            commands::board_rotate,
+            commands::board_edit_set_piece,
+            commands::board_edit_clear,
+            commands::board_edit_set_side,
+            commands::board_edit_clear_all,
+            commands::board_fen
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
