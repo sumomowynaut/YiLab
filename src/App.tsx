@@ -6,6 +6,7 @@ import { PiecePalette } from "./components/board/PiecePalette";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { AnalysisPanel } from "./components/engine/AnalysisPanel";
+import { EvalCurve } from "./components/engine/EvalCurve";
 import { GameCodec } from "./components/io/GameCodec";
 import { getDefaultBoardApi } from "./lib/board/api";
 import { sideToColor } from "./lib/board/notation";
@@ -14,6 +15,7 @@ import { getDefaultGameApi } from "./lib/game/api";
 import { getDefaultIoApi } from "./lib/io/api";
 import { useEngineStore } from "./stores/useEngineStore";
 import { useThemeStore } from "./stores/useThemeStore";
+import { useCurveStore } from "./stores/useCurveStore";
 import { selectDisplayPosition, useGameStore } from "./stores/useGameStore";
 
 function App() {
@@ -53,6 +55,9 @@ function App() {
   const theme = useThemeStore((state) => state.theme);
   const initTheme = useThemeStore((state) => state.initTheme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const curvePoints = useCurveStore((state) => state.points);
+  const curveRecord = useCurveStore((state) => state.record);
+  const curveClear = useCurveStore((state) => state.clear);
   const engineStatus = useEngineStore((state) => state.status);
   const engineId = useEngineStore((state) => state.engineId);
   const engineLines = useEngineStore((state) => state.lines);
@@ -99,6 +104,20 @@ function App() {
   useEffect(() => {
     setCommentDraft(snapshot?.comment ?? "");
   }, [snapshot?.comment]);
+
+  // 评价曲线：分析开启时，把每个分析局面的主变（multipv=1）分数记录为红方视角
+  useEffect(() => {
+    if (!analysisEnabled || !currentFen || !position) {
+      return;
+    }
+    const line = engineLines[1];
+    const score = line?.score;
+    if (!score || !("cp" in score)) {
+      return;
+    }
+    const fromRed = position.sideToMove === "w" ? score.cp : -score.cp;
+    curveRecord(currentFen, fromRed);
+  }, [analysisEnabled, currentFen, position, engineLines, curveRecord]);
 
   // 全局快捷键：←/→ 导航、Home/End 首尾、F/M 翻转/镜像、Space 分析启停、Ctrl+Z/Y 悔棋/重做
   useShortcuts({
@@ -294,6 +313,8 @@ function App() {
                 }
               }}
             />
+
+            <EvalCurve points={curvePoints} onClear={curveClear} />
 
             <div className="flex flex-col gap-1">
               <label htmlFor="comment" className="text-xs text-muted-foreground">

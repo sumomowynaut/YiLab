@@ -33,7 +33,7 @@
 | 19 | 本地开局库 | 离线开局库导入与查询 | P1 | 4 | In Progress | 查询/排序/过滤/JSON 往返单测 | Book Provider、格式调研 | Provider/查询/推荐已实现（内存+JSON）；导入格式待确认（NEEDS_VERIFICATION），SQLite 存储随 DB 阶段 |
 | 20 | 云库 | 皮卡鱼云库查询（W/D/L，可降级） | P2 | 4 | In Progress | 云库 mock + 回退测试 | 云库 API（NEEDS_VERIFICATION） | 接口与降级路径已实现并测试；查询本体待 API 确认 |
 | 21 | 自动走库 | 命中走库 + 脱库步数控制 | P2 | 4 | Done | 走库链路单测（脱库步数 2 用例 + 集成 2） | 本地/云库 | 命中走库 + 脱库步数（半回合门控）已实现（recommend_book + book_auto_move(max_plies)）；引擎回退循环待 UI 阶段 |
-| 22 | 评价曲线 | 主变分数随回合曲线图 | P1 | 3 | Not Started | 分数序列计算 + 图表渲染 | 引擎 info、analysis 表 | 评分可持久化 |
+| 22 | 评价曲线 | 主变分数随回合曲线图 | P1 | 3 | Done | 分数序列计算（4 用例）+ 图表渲染（3 用例） | 引擎 info、analysis 表 | 会话内曲线（红方视角 cp，multipv=1）；持久化随 DB 阶段 |
 | 23 | 自动复盘 | 整局批量分析 + 逐着点评 + 落库 | P1 | 5 | Not Started | 批量分析流程 E2E | 引擎、评价曲线、DB | 异步执行 |
 | 24 | GIF | 导出棋局动态图 | P2 | 5 | Not Started | GIF 产出可播放测试 | UI 渲染、导出 | 独立渲染管线 |
 | 25 | 深色模式 | 深色主题 | P1 | 1 | Done | 主题 store 测试（4 用例）+ App 切换测试 | Tailwind/shadcn 主题令牌 | 与浅色共主题体系；localStorage 持久化 + 跟随系统偏好 |
