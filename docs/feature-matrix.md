@@ -6,7 +6,9 @@
 
 - **Priority**：P0 必须 / P1 重要 / P2 增强。
 - **Phase**：0~6（见 `development-plan.md` §2）。
-- **Status**：`Not Started` / `In Progress` / `Done` / `Blocked` / `Needs Verification`。当前（规划阶段）全部为 `Not Started`。
+- **Status**：`Not Started` / `In Progress` / `Done` / `Blocked` / `Needs Verification`。
+
+> 当前进度（2026-08-23 Web Feature Parity 阶段后）：Done 18 / In Progress 4 / Not Started 9。`NEEDS_VERIFICATION` 项见 `docs/development-plan.md`「未知项」与阶段收尾说明。
 
 ## 矩阵
 
@@ -41,7 +43,7 @@
 | 27 | 快捷键 | 全局键盘快捷键（导航/分析/翻转等） | P2 | 5 | Done | 快捷键映射单测（7）+ hook 测试（3） | UI 状态、命令层 | 可配置清单 `src/lib/shortcuts.ts`（←/→、Home/End、F/M、Space、Ctrl+Z/Y） |
 | 28 | Windows Installer | NSIS/MSI 安装版 | P0 | 6 | Not Started | 安装包冒烟测试 | 打包、许可决策 | 含 WebView2 引导 |
 | 29 | Portable | 便携版 | P1 | 6 | Not Started | 解压即用冒烟 | 打包方案（NEEDS_VERIFICATION） | 便携方案待定 |
-| 30 | GitHub Actions | CI 与 Release 自动化 | P1 | 0 | In Progress | CI 全绿 + Release 触发 | 工程骨架 | Phase 0 CI 骨架已完成；Release 流水线待 Phase 6 |
+| 30 | GitHub Actions | CI 与 Release 自动化 | P1 | 0 | In Progress | CI 全绿 + Release 触发 | 工程骨架 | CI 配置已验证（YAML 合法、与本地全绿命令对齐，clippy --all-targets）；真实 GitHub 运行与 Release 流水线待外部确认/Phase 6 |
 | 31 | GitHub Release | 发布产物到 GitHub Release | P1 | 6 | Not Started | Release 产物校验 | CI/CD、打包 | 依赖许可决策 |
 
 ## 说明

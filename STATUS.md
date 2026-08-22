@@ -5,6 +5,20 @@
 
 ## 当前阶段
 
+**Web Feature Parity ✅ 已完成可确认项（2026-08-23）**
+
+逐项核对 Feature Matrix，按优先级完成全部「可确认」功能（每项独立 test/build/commit）：
+
+- ✅ #8 棋谱注释 / #10 UCI / #11 MultiPV：核对为已实现 → `Done`。
+- ✅ #13 棋谱导入导出：Codec trait（FEN/PGN + 自动嗅探）+ 粘贴/文件导入 + 复制/下载导出 UI（无新依赖）。
+- ✅ #25/#26 深浅色模式：主题 store + 切换按钮 + localStorage 持久化 + 跟随系统偏好。
+- ✅ #27 快捷键：可配置清单 `src/lib/shortcuts.ts`（←/→、Home/End、F/M、Space、Ctrl+Z/Y）+ `useShortcuts` hook。
+- ✅ #21 自动走库：脱库步数（半回合门控，`recommend_book` + `book_auto_move(max_plies)`）+ `GameTree::current_plies`。
+- ✅ #12 引擎参数：设置持久化到 localStorage（重启恢复、损坏回退默认）。
+- ✅ #22 评价曲线：会话内主变分数曲线（红方视角 cp，multipv=1）+ SVG 图表。
+- ✅ #30 GitHub Actions：CI 配置校验（YAML 合法）+ clippy 对齐 `--all-targets`；真实 GitHub 运行与 Release 流水线待外部确认/Phase 6。
+- ⚪ 未能确认/暂缓项：见本文件「需要人工确认 / 后续阶段」清单与 `docs/development-plan.md`「未知项」。
+
 **开局库（Opening Book）✅ 基础完成**
 
 - ✅ `src-tauri/src/book/`：`BookProvider` trait + `BookMove`/`BookStats` + 推荐策略 + `BookChain`（本地优先，云库失败静默回退，**永不失败**）。
@@ -69,11 +83,11 @@
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 90 lib + 10 engine_manager + 30 game_tree + 8 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
+| `cargo test` | ✅ | 96 lib + 10 engine_manager + 30 game_tree + 3 io_codec + 10 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
-| `npm run test` | ✅ | 43 个前端用例 |
+| `npm run test` | ✅ | 75 个前端用例 |
 | `npm run lint` | ✅ | 0 error 0 warning |
 | `npm run format:check` | ✅ | |
 | `npm run build` | ✅ | tsc + vite build |
@@ -103,10 +117,10 @@
 
 ## 下一步
 
-1. Phase 4：导入导出 UI 入口（文件/粘贴/复制）+ 通用导入导出框架（Codec trait）+ TXT 导入导出 + DB（SQLite）阶段。
-2. 开局库 UI：走库面板（候选/推荐/命中提示）+ 自动走库开关 + 脱库步数 + 引擎回退循环。
-3. Phase 3 续：评价曲线 / 自动复盘 / 人机对弈循环。
-4. 开局库导入格式调研（OBK/PFBook）与云库 API 确认（NEEDS_VERIFICATION）。
+1. **需要人工确认（NEEDS_VERIFICATION）**：#14 XQF 规格、#16 TXT 纵线制换算、#17 东萍语法、#18 OCR 模型与权重、#19 开局库导入格式（OBK/PFBook）、#20 云库 API、#29 Tauri 2 便携方案。
+2. Phase 4：DB（SQLite）阶段——开局库/设置/分析结果落库、自动复盘（#23）依赖落库。
+3. Phase 3 续：自动复盘（#23）、GIF 导出（#24，独立渲染管线）、人机对弈循环。
+4. Phase 6：打包（#28 Installer / #31 Release）——受许可决策阻塞，发布前必须完成 `docs/licensing.md` 决策。
 
 ## 关键开放问题（NEEDS_VERIFICATION）
 
@@ -132,3 +146,4 @@
 | 2026-08-22 | PGN 导入导出完成：parser/exporter（元数据/变例/嵌套变例/注释/NAG）、回合前缀分支定位 + `insert_main_at` 修复主/变例顺序、round-trip 等价与二次导出稳定测试；提交 `feat: add pgn support` |
 | 2026-08-23 | 开局库基础完成：BookProvider/BookStats/BookStrategy/BookChain、LocalBookProvider（Zobrist 键 + 非法着法过滤 + JSON 持久化）、CloudBookProvider 设计占位（可降级）、book_lookup/recommend/auto_move 命令；提交 `feat: add opening book` |
 | 2026-08-23 | Web Feature Parity：核对已实现功能（#8 注释/#10 UCI/#11 MultiPV → Done）；实现 #13 导入导出框架（Codec trait + 嗅探 + 粘贴/文件导入 + 复制/下载导出 UI）；提交 `docs: reconcile…` 与 `feat: add import/export framework` |
+| 2026-08-23 | Web Feature Parity（续）：#25/#26 深浅色主题、#27 可配置快捷键、#21 脱库步数、#12 引擎参数持久化、#22 评价曲线、#30 CI 对齐；每项独立提交 |
