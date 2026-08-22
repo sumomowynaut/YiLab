@@ -1,11 +1,13 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
-import { useBoardStore } from "./stores/useBoardStore";
+import { useGameStore } from "./stores/useGameStore";
 
 beforeEach(() => {
-  useBoardStore.setState({
+  useGameStore.setState({
     api: null,
+    boardApi: null,
+    snapshot: null,
     position: null,
     validation: null,
     selected: null,
@@ -14,16 +16,17 @@ beforeEach(() => {
     tool: null,
     view: { flipVertical: false, flipHorizontal: false },
     message: null,
-    loading: false,
+    expandedVariations: [],
   });
 });
 
 describe("App", () => {
-  it("renders the board with the start position", async () => {
+  it("renders the board with the start position and empty move tree", async () => {
     render(<App />);
     expect(await screen.findByText("PikaXiangqi")).toBeInTheDocument();
     expect(screen.getByText("帅")).toBeInTheDocument();
     expect(screen.getByText("红方")).toBeInTheDocument();
+    expect(screen.getByTestId("move-tree-empty")).toBeInTheDocument();
   });
 
   it("toggles the position editor and shows the palette", async () => {

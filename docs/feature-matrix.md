@@ -16,9 +16,9 @@
 | 2 | 合法走棋 | 走法生成 + 合法性校验（马腿/相眼/炮架/过河兵/将帅照面/应将） | P0 | 1 | Done | Rust 规则 52 用例 + perft(1..3)=44/1920/79666 | 棋盘数据模型 | Rust 原生实现，不依赖引擎 |
 | 3 | FEN | 解析与序列化中国象棋 FEN | P0 | 1 | Done | 往返一致 + 错误样例测试 | 棋盘数据模型 | 起始局面见 `game-model.md` |
 | 4 | 局面编辑 | 摆棋/清空/切换先手方并生成 FEN | P1 | 2 | Done | 编辑器组件 + Rust 命令测试 | FEN、棋盘模型 | 提前于 Phase 2 完成；含规则校验提示 |
-| 5 | Game Tree | 棋谱树数据模型与持久化 | P0 | 2 | Not Started | 树操作单元测试 | 棋谱数据模型 | 文档型 JSON 持久化 |
-| 6 | 主线 | 沿第一子节点走主线，主线导航 | P0 | 2 | Not Started | 主线导航单测 + E2E | Game Tree | children[0] 为主线 |
-| 7 | 多变例 | 增/删/提/换序变例，切换显示 | P0 | 2 | Not Started | 变例操作单测 + E2E | Game Tree | 变例着法标记「变」 |
+| 5 | Game Tree | 棋谱树数据模型与持久化 | P0 | 2 | Done | Rust 24 集成测试 + 前端 store/MoveTree 测试 | 棋盘数据模型 | 真实树结构；JSON 持久化待 Phase 4（DB） |
+| 6 | 主线 | 沿第一子节点走主线，主线导航 | P0 | 2 | Done | main_line 测试 + ←/→ 导航测试 | Game Tree | children[0] 为主线 |
+| 7 | 多变例 | 增/删/提/换序变例，切换显示 | P0 | 2 | Done | 变例/嵌套变例测试 + MoveTree 展开/删除测试 | Game Tree | 增/删/嵌套已实现；提/换序待 Phase 4 |
 | 8 | 棋谱注释 | 节点注释与 NAG（?! 等）编辑 | P1 | 2 | Not Started | 注释编辑测试 | Game Tree | 有注释着法标记「*」 |
 | 9 | 本地 Pikafish | 定位/捆绑本地引擎二进制并启动 | P0 | 3 | Not Started | 引擎 spawn/握手集成测试 | Engine Manager、许可决策 | 工作目录解析 NNUE |
 | 10 | UCI | UCI 协议实现（命令编解码 + info 解析） | P0 | 3 | Not Started | UCI 解析 Fixture 测试 | Engine Manager | UCI-Cyclone 坐标 |

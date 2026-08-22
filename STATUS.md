@@ -5,29 +5,29 @@
 
 ## 当前阶段
 
-**Phase 1（Board Core 棋盘核心）✅ 棋盘核心完成**
+**Phase 2（Game Tree 棋谱树）✅ 核心完成**
 
-- ✅ Rust 棋盘核心 `src-tauri/src/board/`：类型（Color/Piece/Square/Move/Position）、规则引擎
-  （走法生成/合法性/将军/将死/困毙/飞将/perft）、FEN 解析与序列化、局面校验、180°旋转与左右镜像。
-- ✅ Rust 单元测试 **52 个**全部通过，覆盖：将军、将军应对、将死、吃子、特殊规则（无升变/飞将/困毙）、
-  炮（炮架）、马腿、象眼、士（九宫）、将（九宫）、车、兵/卒、河界、九宫、FEN、局面校验、旋转/镜像、坐标、perft。
-- ✅ perft 对拍：起始局面 perft(1)=44 / perft(2)=1,920 / perft(3)=79,666（参考 Chess Programming Wiki）。
-- ✅ Tauri 命令：`board_startpos / board_from_fen / board_legal_moves / board_make_move / board_validate /
-  board_rotate / board_edit_set_piece / board_edit_clear / board_edit_set_side / board_edit_clear_all`。
-- ✅ React Board UI：SVG 棋盘（10×9、九宫斜线、楚河汉界）、棋子渲染、选中与合法落点提示、
-  走子（经 Rust 校验）、翻转棋盘/左右镜像视图、局面编辑器（棋子面板/橡皮/清空/切换先手方/FEN 载入）、校验结果展示。
-- ✅ 前端测试 **15 个**全部通过（notation、Board 组件、App、utils）。
-- ⛔ 尚未实现：棋谱树/变例（Phase 2）、Pikafish 引擎（Phase 3）、开局库/OCR（Phase 4/5）等。
+- ✅ Rust 棋谱树 `src-tauri/src/game/`：**真正的树结构**（非着法数组）——
+  Root / MoveNode（含父指针与有序子节点）/ MainLine（children[0]）/ Variation / Nested Variation /
+  CurrentNode / Undo（悔棋栈）/ Redo（重做栈）/ InsertMove（合法校验 + 相同着法复用）/ DeleteVariation（整棵子树）/ Navigate /
+  Comments / Annotations（NAG ! ? !! ?? !? ?! = ~）。
+- ✅ **从任意节点回放父链恢复完整 Position**（`restore_position`，与节点缓存 FEN 一致性测试通过）。
+- ✅ Tauri 命令：`game_new / game_snapshot / game_insert_move / game_navigate / game_previous / game_next /
+  game_undo / game_redo / game_go_to_start / game_go_to_end / game_delete_variation / game_set_comment / game_set_nag`。
+- ✅ React Move Tree UI：点击棋步跳转、左右键导航（←/→）、Ctrl+Z/Y 悔棋/重做、
+  Variation 展开/收起、变例删除（🗑）、注释显示（*）与编辑、NAG 按钮、当前棋步高亮、嵌套变例递归渲染。
+- ✅ 测试：Rust 76 个（棋盘 52 + 棋谱树集成 24）、前端 28 个（含 MoveTree 7 个、game store 6 个）。
+- ⛔ 尚未实现：PGN/XQF/东萍 导入导出（Phase 2 收尾）、Pikafish 引擎（Phase 3）、开局库/OCR（Phase 4/5）。
 
 ## 验收命令（全部通过）
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 52 个 Rust 用例 |
-| `cargo clippy -- -D warnings` | ✅ | |
+| `cargo test` | ✅ | 52 lib + 24 game_tree 集成测试（沙箱需清单变通，见下） |
+| `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
-| `npm run test` | ✅ | 15 个前端用例 |
+| `npm run test` | ✅ | 28 个前端用例 |
 | `npm run lint` | ✅ | 0 error 0 warning |
 | `npm run format:check` | ✅ | |
 | `npm run build` | ✅ | tsc + vite build |
@@ -36,12 +36,17 @@
 ## 本机（沙箱）环境说明
 
 - 本机未安装 MSVC Build Tools；Rust 使用 **GNU 工具链**（rustup 安装在仓库内 `.toolchain/`，已 gitignore）。
-- 项目路径含中文（`D:\Codex 项目\PikaXiangqi`），GNU 工具链（dlltool/ld）无法处理非 ASCII 路径。
-  **变通：设置 `CARGO_TARGET_DIR` 为纯 ASCII 目录**（如 `%TEMP%\pika-build\target`）后，`cargo check` / `cargo test` 在真实仓库内全部通过。
-- 正式开发机与 CI（`windows-latest`，MSVC toolchain，ASCII 路径）无需该变通。
+- 项目路径含中文（`D:\Codex 项目\PikaXiangqi`），GNU 工具链无法处理非 ASCII 路径。
+  **变通：设置 `CARGO_TARGET_DIR` 为纯 ASCII 目录**。
+- **Tauri 运行时链接与清单（仅 GNU 沙箱需要）**：
+  - `#[tauri::command]` 宏展开会保留 tauri 运行时，测试二进制因此需要 comctl32 v6（`TaskDialogIndirect`）与 `WebView2Loader.dll`；
+  - tauri-build 只把清单资源链接到 bin（`link-arg-bins`），lib 测试二进制默认无清单；
+  - 沙箱变通：① 重命名 mingw 的 `default-manifest.o`（避免清单合并冲突）；② 运行 `cargo test` 时设置
+    `RUSTFLAGS="-C link-arg=<build>\libresource.a"`（把 comctl32 v6 清单链接进测试二进制）。
+  - **MSVC / CI（windows-latest）无需任何变通，`cargo test` 直接可用**。
 - `npm` 由沙箱内置 pnpm 全局安装（npm 12）；正常开发机自带 npm 即可。
 - 依赖镜像：本机验证使用 npmmirror（npm）与 rsproxy（crates.io）；CI 使用默认源。
-- 浏览器 `npm run dev` 使用内存回退 API（仅展示起始局面）；走子/编辑需在 Tauri 环境运行（Rust 规则核心）。
+- 浏览器 `npm run dev` 使用内存回退 API（仅展示起始局面）；走子/编辑/棋谱树需在 Tauri 环境运行（Rust 核心）。
 
 ## 状态图例
 
@@ -55,10 +60,10 @@
 
 `docs/feature-matrix.md` 中的 `Status` 使用同一图例的文字形式。
 
-## 下一步（Phase 1 收尾 / Phase 2）
+## 下一步（Phase 2 收尾 / Phase 3）
 
-1. Phase 1 收尾：深浅色主题切换（feature-matrix #25/#26）。
-2. Phase 2：棋谱树 Game Tree（主线/变例/注释）+ PGN/TXT 导入导出 + 局面编辑器完善。
+1. Phase 2 收尾：PGN / TXT 导入导出（feature-matrix #13/#15/#16），棋盘→棋谱树联动的进一步完善。
+2. Phase 3：Pikafish 引擎集成（Engine Manager + UCI + MultiPV + 评价曲线）。
 
 ## 关键开放问题（NEEDS_VERIFICATION）
 
@@ -77,3 +82,4 @@
 | 2026-08-22 | 建立架构文档集、AGENTS.md、STATUS.md、feature-matrix.md；确认 Phase 0 前状态 |
 | 2026-08-22 | Phase 0 完成：Tauri 2 + React/TS + Rust 骨架、Tailwind/shadcn/ui、Zustand、测试、ESLint/Prettier/rustfmt、husky、基础 CI；提交 `chore: bootstrap project` |
 | 2026-08-22 | Phase 1 棋盘核心完成：Rust 规则引擎（52 测试，perft 对拍 44/1920/79666）、FEN、校验、旋转；React 棋盘 UI + 局面编辑器；提交 `feat: implement xiangqi board core` |
+| 2026-08-22 | Phase 2 棋谱树完成：真实树结构（Root/MoveNode/主线/变例/嵌套变例/Undo/Redo/InsertMove/DeleteVariation/Navigate/注释/NAG）、任意节点恢复局面、React Move Tree UI、Rust 76 + 前端 28 测试；提交 `feat: implement game tree` |

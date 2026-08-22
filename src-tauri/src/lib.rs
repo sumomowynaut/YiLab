@@ -2,6 +2,7 @@
 
 pub mod board;
 mod commands;
+pub mod game;
 
 /// 返回应用版本（来自 Cargo.toml）。
 #[tauri::command]
@@ -32,7 +33,20 @@ pub fn run() {
             commands::board_edit_clear,
             commands::board_edit_set_side,
             commands::board_edit_clear_all,
-            commands::board_fen
+            commands::board_fen,
+            commands::game_new,
+            commands::game_snapshot,
+            commands::game_insert_move,
+            commands::game_navigate,
+            commands::game_previous,
+            commands::game_next,
+            commands::game_undo,
+            commands::game_redo,
+            commands::game_go_to_start,
+            commands::game_go_to_end,
+            commands::game_delete_variation,
+            commands::game_set_comment,
+            commands::game_set_nag
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
