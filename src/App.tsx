@@ -12,6 +12,7 @@ import { getDefaultEngineApi } from "./lib/engine/api";
 import { getDefaultGameApi } from "./lib/game/api";
 import { getDefaultIoApi } from "./lib/io/api";
 import { useEngineStore } from "./stores/useEngineStore";
+import { useThemeStore } from "./stores/useThemeStore";
 import { selectDisplayPosition, useGameStore } from "./stores/useGameStore";
 
 function App() {
@@ -48,6 +49,9 @@ function App() {
   const setNag = useGameStore((state) => state.setNag);
   const toggleVariation = useGameStore((state) => state.toggleVariation);
   const adoptSnapshot = useGameStore((state) => state.adoptSnapshot);
+  const theme = useThemeStore((state) => state.theme);
+  const initTheme = useThemeStore((state) => state.initTheme);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const engineStatus = useEngineStore((state) => state.status);
   const engineId = useEngineStore((state) => state.engineId);
   const engineLines = useEngineStore((state) => state.lines);
@@ -71,6 +75,11 @@ function App() {
   useEffect(() => {
     void init(getDefaultGameApi(), getDefaultBoardApi());
   }, [init]);
+
+  // 主题初始化（localStorage / 系统偏好）
+  useEffect(() => {
+    initTheme();
+  }, [initTheme]);
 
   // 引擎初始化（订阅事件）
   useEffect(() => {
@@ -132,9 +141,20 @@ function App() {
   return (
     <main className="flex min-h-screen items-start justify-center bg-background p-6 text-foreground">
       <Card className="w-full max-w-5xl">
-        <CardHeader>
-          <CardTitle>PikaXiangqi</CardTitle>
-          <CardDescription>中国象棋复盘与分析 — 棋谱树 + 引擎分析（Phase 3）</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>PikaXiangqi</CardTitle>
+            <CardDescription>中国象棋复盘与分析 — 棋谱树 + 引擎分析（Phase 3）</CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="theme-toggle"
+            onClick={toggleTheme}
+            aria-label="切换深浅色主题"
+          >
+            {theme === "dark" ? "☀ 浅色" : "🌙 深色"}
+          </Button>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-6">
           <div className="flex flex-col gap-2">

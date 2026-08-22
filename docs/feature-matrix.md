@@ -36,8 +36,8 @@
 | 22 | 评价曲线 | 主变分数随回合曲线图 | P1 | 3 | Not Started | 分数序列计算 + 图表渲染 | 引擎 info、analysis 表 | 评分可持久化 |
 | 23 | 自动复盘 | 整局批量分析 + 逐着点评 + 落库 | P1 | 5 | Not Started | 批量分析流程 E2E | 引擎、评价曲线、DB | 异步执行 |
 | 24 | GIF | 导出棋局动态图 | P2 | 5 | Not Started | GIF 产出可播放测试 | UI 渲染、导出 | 独立渲染管线 |
-| 25 | 深色模式 | 深色主题 | P1 | 1 | Not Started | 主题切换测试 | Tailwind/shadcn 主题令牌 | 与浅色共主题体系 |
-| 26 | 浅色模式 | 浅色主题 | P1 | 1 | Not Started | 主题切换测试 | 主题令牌 | 默认浅色 |
+| 25 | 深色模式 | 深色主题 | P1 | 1 | Done | 主题 store 测试（4 用例）+ App 切换测试 | Tailwind/shadcn 主题令牌 | 与浅色共主题体系；localStorage 持久化 + 跟随系统偏好 |
+| 26 | 浅色模式 | 浅色主题 | P1 | 1 | Done | 主题 store 测试（4 用例）+ App 切换测试 | 主题令牌 | 默认浅色（`:root`），随主题切换 |
 | 27 | 快捷键 | 全局键盘快捷键（导航/分析/翻转等） | P2 | 5 | Not Started | 快捷键映射单测 | UI 状态、命令层 | 提供可配置清单 |
 | 28 | Windows Installer | NSIS/MSI 安装版 | P0 | 6 | Not Started | 安装包冒烟测试 | 打包、许可决策 | 含 WebView2 引导 |
 | 29 | Portable | 便携版 | P1 | 6 | Not Started | 解压即用冒烟 | 打包方案（NEEDS_VERIFICATION） | 便携方案待定 |

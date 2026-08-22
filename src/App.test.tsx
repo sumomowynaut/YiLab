@@ -37,4 +37,14 @@ describe("App", () => {
     expect(screen.getByTestId("palette-red-king")).toBeInTheDocument();
     expect(screen.getByTestId("palette-eraser")).toBeInTheDocument();
   });
+
+  it("toggles the dark theme via the header button", async () => {
+    document.documentElement.classList.remove("dark");
+    render(<App />);
+    await screen.findByText("帅");
+    const button = screen.getByTestId("theme-toggle");
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    fireEvent.click(button);
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+  });
 });
