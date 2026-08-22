@@ -1,9 +1,19 @@
 # STATUS.md
 
 > 本文档记录 PikaXiangqi 项目的实时状态。提交代码前先更新这里。
-> 最后更新：2026-08-22
+> 最后更新：2026-08-23
 
 ## 当前阶段
+
+**开局库（Opening Book）✅ 基础完成**
+
+- ✅ `src-tauri/src/book/`：`BookProvider` trait + `BookMove`/`BookStats` + 推荐策略 + `BookChain`（本地优先，云库失败静默回退，**永不失败**）。
+- ✅ `LocalBookProvider`：内存 `HashMap<u64, Vec<BookMove>>` + JSON 持久化（version 1）；查询按局面 Zobrist 哈希（`board::zobrist`，确定性），**过滤非法着法**后按「得分 → 出现次数 → 字典序」降序返回；支持胜/和/负统计（数据源提供时）。
+- ✅ `CloudBookProvider`：设计占位（endpoint 保留，`lookup` 返回 `Unavailable`，**不发起网络请求**）；云库 API 未确认（`NEEDS_VERIFICATION`，见 docs/book.md §3）。
+- ✅ 推荐/自动走库：`BookChain::recommend`（best_score / most_popular / first）+ Tauri 命令 `book_lookup` / `book_recommend` / `book_auto_move`（把推荐着法插入当前棋谱树，未命中返回 `applied=None`）。
+- ✅ **与引擎完全解耦**：`book` 不依赖 `engine` 模块；走库是「开局库 → 棋谱树」直接路径。
+- ✅ 测试：Rust 单元 17（zobrist 3 + book 14）+ 集成 8（排序/推荐/链回退/降级/JSON 往返/自动走库/树查询）。
+- ⚪ 开局库导入格式（OBK/PFBook，`NEEDS_VERIFICATION`）、SQLite 存储（DB 阶段）、脱库步数与引擎回退循环（UI 阶段）。
 
 **PGN 导入导出 ✅ 完成（Phase 2 收尾）**
 
@@ -59,7 +69,7 @@
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 73 lib + 10 engine_manager + 30 game_tree + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
+| `cargo test` | ✅ | 90 lib + 10 engine_manager + 30 game_tree + 8 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
@@ -93,9 +103,10 @@
 
 ## 下一步
 
-1. Phase 4：导入导出 UI 入口（文件/粘贴/复制）+ 通用导入导出框架（Codec trait）+ TXT 导入导出。
-2. Phase 3 续：评价曲线 / 自动复盘 / 人机对弈循环。
-3. XQF / 东萍棋谱：需先完成格式调研（NEEDS_VERIFICATION，见 `docs/development-plan.md`）。
+1. Phase 4：导入导出 UI 入口（文件/粘贴/复制）+ 通用导入导出框架（Codec trait）+ TXT 导入导出 + DB（SQLite）阶段。
+2. 开局库 UI：走库面板（候选/推荐/命中提示）+ 自动走库开关 + 脱库步数 + 引擎回退循环。
+3. Phase 3 续：评价曲线 / 自动复盘 / 人机对弈循环。
+4. 开局库导入格式调研（OBK/PFBook）与云库 API 确认（NEEDS_VERIFICATION）。
 
 ## 关键开放问题（NEEDS_VERIFICATION）
 
@@ -119,3 +130,4 @@
 | 2026-08-22 | Pikafish 引擎层完成：Engine Manager/UCI 编解码/Mock 引擎/崩溃重启/超时/分析切换局面；真实 Pikafish 冒烟通过；提交 `feat: integrate pikafish engine` |
 | 2026-08-22 | 引擎分析 UI：Analysis Panel（评价/深度/NPS/PV/MultiPV）、参数面板、开始/停止/重启、PV 棋盘预览、切换局面防竞态；提交 `feat: add engine analysis interface` |
 | 2026-08-22 | PGN 导入导出完成：parser/exporter（元数据/变例/嵌套变例/注释/NAG）、回合前缀分支定位 + `insert_main_at` 修复主/变例顺序、round-trip 等价与二次导出稳定测试；提交 `feat: add pgn support` |
+| 2026-08-23 | 开局库基础完成：BookProvider/BookStats/BookStrategy/BookChain、LocalBookProvider（Zobrist 键 + 非法着法过滤 + JSON 持久化）、CloudBookProvider 设计占位（可降级）、book_lookup/recommend/auto_move 命令；提交 `feat: add opening book` |

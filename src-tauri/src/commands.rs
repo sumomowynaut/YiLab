@@ -8,6 +8,7 @@ use crate::board::{
     types::{Color, Move, Piece, PieceKind, Position, Square, START_FEN},
     validate::ValidationResult,
 };
+use crate::book::{dto::BookMoveDto, local::LocalBookProvider, BookChain, BookMove, BookStrategy};
 use crate::game::{
     dto::{snapshot as game_snapshot_dto, GameSnapshot},
     nag::Nag,
@@ -429,4 +430,67 @@ pub fn pgn_export() -> Result<String, String> {
     Ok(crate::io::pgn::export(
         &*game_tree().lock().map_err(game_err)?,
     ))
+}
+
+// ===================== 开局库（Book）命令 =====================
+
+/// 应用级开局库状态（本地优先 + 可选云库；云库失败静默回退）。
+fn book_chain() -> &'static Mutex<BookChain> {
+    static BOOK: OnceLock<Mutex<BookChain>> = OnceLock::new();
+    BOOK.get_or_init(|| Mutex::new(BookChain::local_only(Box::new(LocalBookProvider::new()))))
+}
+
+fn parse_strategy(s: &str) -> Result<BookStrategy, String> {
+    BookStrategy::from_name(s).ok_or_else(|| format!("未知走库策略：{s}"))
+}
+
+/// 查询当前局面的候选着法（本地优先，未命中回退云库）。
+#[tauri::command]
+pub fn book_lookup() -> Result<Vec<BookMoveDto>, String> {
+    let tree = game_tree().lock().map_err(game_err)?;
+    let pos = tree.restore_position(tree.current_id()).map_err(game_err)?;
+    let chain = book_chain().lock().map_err(game_err)?;
+    Ok(chain.lookup(&pos).iter().map(BookMoveDto::from).collect())
+}
+
+/// 查询当前局面的推荐着法（策略：best_score / most_popular / first）。
+#[tauri::command]
+pub fn book_recommend(strategy: String) -> Result<Option<BookMoveDto>, String> {
+    let strategy = parse_strategy(&strategy)?;
+    let tree = game_tree().lock().map_err(game_err)?;
+    let pos = tree.restore_position(tree.current_id()).map_err(game_err)?;
+    let chain = book_chain().lock().map_err(game_err)?;
+    Ok(chain
+        .recommend(&pos, strategy)
+        .map(|b| BookMoveDto::from(&b)))
+}
+
+/// 自动走库：把推荐着法插入当前棋谱树（未命中则不改动，返回 applied=None）。
+#[tauri::command]
+pub fn book_auto_move(strategy: String) -> Result<BookAutoMoveDto, String> {
+    let strategy = parse_strategy(&strategy)?;
+    let mut tree = game_tree().lock().map_err(game_err)?;
+    let pos = tree.restore_position(tree.current_id()).map_err(game_err)?;
+    let recommended = book_chain()
+        .lock()
+        .map_err(game_err)?
+        .recommend(&pos, strategy);
+    let applied = match recommended {
+        Some(BookMove { mv, .. }) => {
+            tree.insert_move(mv).map_err(game_err)?;
+            Some(mv.uci())
+        }
+        None => None,
+    };
+    let snapshot = game_snapshot_dto(&tree).map_err(game_err)?;
+    Ok(BookAutoMoveDto { applied, snapshot })
+}
+
+/// 自动走库命令结果。
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookAutoMoveDto {
+    /// 实际走出的着法（UCI）；开局库未命中时为 None。
+    pub applied: Option<String>,
+    pub snapshot: GameSnapshot,
 }

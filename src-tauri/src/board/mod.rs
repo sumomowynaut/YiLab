@@ -9,6 +9,7 @@ pub mod rules;
 pub mod transform;
 pub mod types;
 pub mod validate;
+pub mod zobrist;
 
 #[cfg(test)]
 mod tests;

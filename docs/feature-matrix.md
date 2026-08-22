@@ -30,9 +30,9 @@
 | 16 | TXT | 中文纵线制文本棋谱导入导出 | P1 | 2 | Not Started | 往返 + 换算边界 | 导入导出框架 | 线性为主 |
 | 17 | 东萍棋谱 | 东萍格式导入导出（支持变例） | P1 | 4 | Not Started | 往返 + 样本库 | 格式调研（NEEDS_VERIFICATION） | 语法待确认 |
 | 18 | 截图识别 | 棋盘图片识别局面（可人工校正） | P2 | 5 | Not Started | OCR 结构 + 校正 E2E | OCR 管线 | 可降级 |
-| 19 | 本地开局库 | 离线开局库导入与查询 | P1 | 4 | Not Started | 查询排序单测 | Book Provider、格式调研 | 完全离线 |
-| 20 | 云库 | 皮卡鱼云库查询（W/D/L，可降级） | P2 | 4 | Not Started | 云库 mock + 回退测试 | 云库 API（NEEDS_VERIFICATION） | 失败回退本地 |
-| 21 | 自动走库 | 命中走库 + 脱库步数控制 | P2 | 4 | Not Started | 走库链路单测 | 本地/云库 | 脱库步数语义对齐网页版 |
+| 19 | 本地开局库 | 离线开局库导入与查询 | P1 | 4 | In Progress | 查询/排序/过滤/JSON 往返单测 | Book Provider、格式调研 | Provider/查询/推荐已实现（内存+JSON）；导入格式待确认（NEEDS_VERIFICATION），SQLite 存储随 DB 阶段 |
+| 20 | 云库 | 皮卡鱼云库查询（W/D/L，可降级） | P2 | 4 | In Progress | 云库 mock + 回退测试 | 云库 API（NEEDS_VERIFICATION） | 接口与降级路径已实现并测试；查询本体待 API 确认 |
+| 21 | 自动走库 | 命中走库 + 脱库步数控制 | P2 | 4 | In Progress | 走库链路单测 | 本地/云库 | Rust 侧走库原语（book_auto_move）已实现；脱库步数与引擎回退循环待 UI 阶段 |
 | 22 | 评价曲线 | 主变分数随回合曲线图 | P1 | 3 | Not Started | 分数序列计算 + 图表渲染 | 引擎 info、analysis 表 | 评分可持久化 |
 | 23 | 自动复盘 | 整局批量分析 + 逐着点评 + 落库 | P1 | 5 | Not Started | 批量分析流程 E2E | 引擎、评价曲线、DB | 异步执行 |
 | 24 | GIF | 导出棋局动态图 | P2 | 5 | Not Started | GIF 产出可播放测试 | UI 渲染、导出 | 独立渲染管线 |

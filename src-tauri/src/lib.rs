@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 pub mod board;
+pub mod book;
 mod commands;
 pub mod engine;
 pub mod game;
@@ -60,7 +61,10 @@ pub fn run() {
             commands::engine_restart,
             commands::engine_quit,
             commands::pgn_import,
-            commands::pgn_export
+            commands::pgn_export,
+            commands::book_lookup,
+            commands::book_recommend,
+            commands::book_auto_move
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
