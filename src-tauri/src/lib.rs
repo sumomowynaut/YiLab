@@ -2,6 +2,7 @@
 
 pub mod board;
 mod commands;
+pub mod engine;
 pub mod game;
 
 /// 返回应用版本（来自 Cargo.toml）。

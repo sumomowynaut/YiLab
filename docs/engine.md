@@ -149,3 +149,9 @@ analysis_stop():
 - tokio：引擎 stdout 用 `BufReader::read_line` 异步读取，逐行解析，不阻塞主线程。
 - 所有 `setoption`/`isready` 支持超时；超时视为引擎无响应，进入崩溃恢复。
 - 引擎二进制缺失/无执行权限 → 启动失败，UI 提示配置引擎路径（支持用户自选引擎文件）。
+## 8. 已实现（2026-08-22）
+
+- `src-tauri/src/engine/`：`types`（Info/BestMove/Event/Status/GoParams/UciOption）、`uci`（命令构建 + stdout 解析，纯函数）、`manager`（EngineManager，tokio 单任务事件循环）。
+- Mock 引擎 `mock_engine`（`[[bin]]`）用于集成测试；真实 Pikafish 冒烟测试 `tests/pikafish_smoke.rs`（默认 ignore，需 `PIKAFISH_BIN`/`PIKAFISH_CWD`）。
+- 引擎工作目录通过 `EngineConfig.cwd` 指定，使引擎默认读到同目录 `pikafish.nnue`。
+- 分发（安装包捆绑引擎/权重）受许可证决策约束，当前不实现；详见 `STATUS.md` 与 `licensing.md`。

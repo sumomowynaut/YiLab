@@ -5,6 +5,17 @@
 
 ## 当前阶段
 
+**Phase 3（Pikafish Engine）✅ 引擎层完成（UI 待后续）**
+
+- ✅ `src-tauri/src/engine/`：Engine interface（`EngineManager`）、Engine Process（tokio 异步）、UCI parser / command builder。
+- ✅ 支持：`uci` / `isready` / `setoption` / `position` / `go` / `stop` / `quit`。
+- ✅ 解析：`info`（depth/seldepth/score cp|mate/nodes/nps/time/pv/multipv/lowerbound/upperbound）、`bestmove`（含 ponder、(none)）。
+- ✅ 选项：Threads / Hash / MultiPV / Depth / MoveTime / Nodes（`GoParams` + `setoption`）。
+- ✅ 生命周期处理：启动失败（握手超时/提前退出）、崩溃（stdout EOF → Crashed 事件）、停止/等待超时（token 定时器）、restart、quit、**分析期间切换局面**（先 stop 等 bestmove 再 position+go）。
+- ✅ Mock 引擎（`mock_engine` bin，可通过 `MOCK_BEHAVIOR` 注入 no_uciok/no_readyok/crash_on_go/hang_on_go）驱动 9 个集成测试。
+- ✅ 真实 Pikafish 冒烟测试（`tests/pikafish_smoke.rs`，默认 `#[ignore]`）：官方 Pikafish-2026-01-02 本地运行通过（握手、Threads/Hash/MultiPV、分析出 info+bestmove）。
+- ⛔ 引擎 UI / 引擎参数面板 / MultiPV 展示 / 评价曲线 / 自动复盘：后续 Phase 3 子任务（feature-matrix #9/#10/#11/#12/#22）。
+
 **Phase 2（Game Tree 棋谱树）✅ 核心完成 + 架构审查修复完成**
 
 - ✅ Rust 棋谱树 `src-tauri/src/game/`：真实树结构（Root / MoveNode / MainLine / Variation / Nested Variation / Undo / Redo / InsertMove / DeleteVariation / Navigate / Comments / NAG / Promote / Reorder / 文档序列化）。
@@ -12,32 +23,31 @@
 - ✅ React Move Tree UI：点击跳转、←/→ 导航、Ctrl+Z/Y 悔棋/重做、变例展开/删除/**提升主线/上移/下移**、注释显示与编辑、NAG、当前棋步高亮。
 - ✅ 测试：Rust 83（棋盘 53 + 棋谱树集成 30）、前端 30。
 
-### 架构审查修复（本轮，commit `fix: address game tree architecture review`）
+### 架构审查修复（commit `fix: address game tree architecture review`）
 
 **已修复**
 
 | 项 | 内容 |
 |----|------|
-| H1 | 注释/NAG 修改改为**按 node_id 显式定位**（`game_set_comment(node_id, ...)` / `game_set_nag(node_id, ...)`，Rust `set_comment_at`/`set_nag_at`），不再依赖全局 current；附回归测试（节点 A 写注释→导航到 B→注释仍在 A） |
-| H2 | 明确 **Document State**（startpos/root/nodes/headers）与 **Session State**（current/redo_stack）边界；新增 `game::serialize`（tree_json v1）**只序列化文档字段**，导入时校验结构并重置会话状态；往返测试证明 current/redo_stack 不进入持久化 |
-| H3 | `GameNode` 插入时缓存 `side_to_move`/`fullmove_number`，快照 `build_node` 不再逐节点 `parse_fen`；一致性测试保证缓存与局面相符 |
-| M1 | store 非编辑态 position 由 `snapshot.position` 派生（`selectDisplayPosition`），编辑态使用独立 `editPosition`；clearAll/toggleSide 限定编辑态 |
+| H1 | 注释/NAG 修改改为**按 node_id 显式定位**（`game_set_comment(node_id, ...)` / `game_set_nag(node_id, ...)`，Rust `set_comment_at`/`set_nag_at`），不再依赖全局 current；附回归测试 |
+| H2 | 明确 **Document State** 与 **Session State** 边界；`game::serialize`（tree_json v1）只序列化文档字段，导入时校验结构并重置会话状态；往返测试证明 current/redo_stack 不进入持久化 |
+| H3 | `GameNode` 插入时缓存 `side_to_move`/`fullmove_number`，快照不再逐节点 `parse_fen`；一致性测试 |
+| M1 | store 非编辑态 position 由 `snapshot.position` 派生（`selectDisplayPosition`），编辑态使用独立 `editPosition` |
 | M2 | 实现 `promote_variation` / `reorder_variation`（Rust + 命令 + React UI 提升/上移/下移 + 测试） |
-| M3 | 新增 `attacks_square`（免临时 Vec 分配）并接入 `is_attacked`；等价性测试保证与走法生成一致；**perft 44/1920/79666 全部保持通过** |
+| M3 | 新增 `attacks_square`（免临时 Vec 分配）并接入 `is_attacked`；等价性测试；perft 44/1920/79666 保持通过 |
 
-**暂缓/记录（不强行实现）**
+**暂缓/记录**：`GameSession` 拆分、增量快照、`truncate`、store 拆分、`apply_move` 分配优化（均已记录于 docs/STATUS）。
 
-- `GameTree` 拆分为 `GameSession { tree, current, redo_stack }`：当前改动最小方案是保留同结构 + 明确文档/会话边界 + 序列化排除会话字段；拆分记为后续重构项。
-- 全树快照 → 增量/可见范围快照：当前棋谱规模小，暂缓；已在 `docs/architecture.md` 记录。
-- `truncate`：非本轮必要范围，记录为后续 Phase（导入导出时）。
-- store 进一步拆分（`useGameStore`/`useBoardStore` 分离）：记为后续重构项。
-- `apply_move`（`legal_moves().contains`）分配优化：收益低、风险高于收益，记录为后续性能项。
+## 引擎许可状态（只记录，不判断）
+
+- 冒烟测试使用的 Pikafish 二进制与 NNUE 权重仅为**本机本地验证**，存放在 `.toolchain/pikafish/`（已 gitignore），**不提交、不参与任何分发路径**。
+- 分发/捆绑（安装包内置引擎与权重）仍受许可证决策约束（见 `docs/licensing.md`），**在决策完成前不实现任何分发相关代码**。
 
 ## 验收命令（全部通过）
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 53 lib + 30 game_tree 集成测试（沙箱需清单变通，见下） |
+| `cargo test` | ✅ | 64 lib + 9 engine_manager + 30 game_tree（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
@@ -52,15 +62,10 @@
 - 本机未安装 MSVC Build Tools；Rust 使用 **GNU 工具链**（rustup 安装在仓库内 `.toolchain/`，已 gitignore）。
 - 项目路径含中文（`D:\Codex 项目\PikaXiangqi`），GNU 工具链无法处理非 ASCII 路径。
   **变通：设置 `CARGO_TARGET_DIR` 为纯 ASCII 目录**。
-- **Tauri 运行时链接与清单（仅 GNU 沙箱需要）**：
-  - `#[tauri::command]` 宏展开会保留 tauri 运行时，测试二进制因此需要 comctl32 v6（`TaskDialogIndirect`）与 `WebView2Loader.dll`；
-  - tauri-build 只把清单资源链接到 bin（`link-arg-bins`），lib 测试二进制默认无清单；
-  - 沙箱变通：① 重命名 mingw 的 `default-manifest.o`（避免清单合并冲突）；② 运行 `cargo test` 时设置
-    `RUSTFLAGS="-C link-arg=<build>\libresource.a"`（把 comctl32 v6 清单链接进测试二进制）。
-  - **MSVC / CI（windows-latest）无需任何变通，`cargo test` 直接可用**。
-- `npm` 由沙箱内置 pnpm 全局安装（npm 12）；正常开发机自带 npm 即可。
-- 依赖镜像：本机验证使用 npmmirror（npm）与 rsproxy（crates.io）；CI 使用默认源。
-- 浏览器 `npm run dev` 使用内存回退 API（仅展示起始局面）；走子/编辑/棋谱树需在 Tauri 环境运行（Rust 核心）。
+- **Tauri 运行时链接与清单（仅 GNU 沙箱需要）**：`cargo test` 时设置
+  `RUSTFLAGS="-C link-arg=<build>\libresource.a"`；MSVC / CI（windows-latest）无需变通。
+- 真实 Pikafish 冒烟测试：`PIKAFISH_BIN=<engine.exe> PIKAFISH_CWD=<目录(含 pikafish.nnue)> cargo test --test pikafish_smoke -- --ignored`。
+- 浏览器 `npm run dev` 使用内存回退 API；走子/编辑/棋谱树/引擎需在 Tauri 环境运行（Rust 核心）。
 
 ## 状态图例
 
@@ -74,10 +79,10 @@
 
 `docs/feature-matrix.md` 中的 `Status` 使用同一图例的文字形式。
 
-## 下一步（Phase 2 收尾 / Phase 3）
+## 下一步
 
-1. Phase 2 收尾：PGN / TXT 导入导出（feature-matrix #13/#15/#16）；`truncate` 随导入导出落地。
-2. Phase 3：Pikafish 引擎集成（Engine Manager + UCI + MultiPV + 评价曲线）。
+1. Phase 3 续：引擎命令层 + Engine UI（引擎面板/MultiPV/评价曲线/自动复盘）。
+2. Phase 2 收尾：PGN / TXT 导入导出。
 
 ## 关键开放问题（NEEDS_VERIFICATION）
 
@@ -98,3 +103,4 @@
 | 2026-08-22 | Phase 1 棋盘核心完成：Rust 规则引擎（52 测试，perft 对拍 44/1920/79666）、FEN、校验、旋转；React 棋盘 UI + 局面编辑器；提交 `feat: implement xiangqi board core` |
 | 2026-08-22 | Phase 2 棋谱树完成：真实树结构、任意节点恢复局面、React Move Tree UI；提交 `feat: implement game tree` |
 | 2026-08-22 | 架构审查修复：H1 注释/NAG 按节点定位、H2 文档/会话状态边界 + tree_json 序列化、H3 快照去 parse_fen、M1 position 派生、M2 变例提升/排序、M3 attacks_square；提交 `fix: address game tree architecture review` |
+| 2026-08-22 | Pikafish 引擎层完成：Engine Manager/UCI 编解码/Mock 引擎/崩溃重启/超时/分析切换局面；真实 Pikafish 冒烟通过；提交 `feat: integrate pikafish engine` |
