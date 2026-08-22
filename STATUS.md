@@ -131,3 +131,4 @@
 | 2026-08-22 | 引擎分析 UI：Analysis Panel（评价/深度/NPS/PV/MultiPV）、参数面板、开始/停止/重启、PV 棋盘预览、切换局面防竞态；提交 `feat: add engine analysis interface` |
 | 2026-08-22 | PGN 导入导出完成：parser/exporter（元数据/变例/嵌套变例/注释/NAG）、回合前缀分支定位 + `insert_main_at` 修复主/变例顺序、round-trip 等价与二次导出稳定测试；提交 `feat: add pgn support` |
 | 2026-08-23 | 开局库基础完成：BookProvider/BookStats/BookStrategy/BookChain、LocalBookProvider（Zobrist 键 + 非法着法过滤 + JSON 持久化）、CloudBookProvider 设计占位（可降级）、book_lookup/recommend/auto_move 命令；提交 `feat: add opening book` |
+| 2026-08-23 | Web Feature Parity：核对已实现功能（#8 注释/#10 UCI/#11 MultiPV → Done）；实现 #13 导入导出框架（Codec trait + 嗅探 + 粘贴/文件导入 + 复制/下载导出 UI）；提交 `docs: reconcile…` 与 `feat: add import/export framework` |

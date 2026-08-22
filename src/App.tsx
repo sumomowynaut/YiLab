@@ -5,10 +5,12 @@ import { PiecePalette } from "./components/board/PiecePalette";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { AnalysisPanel } from "./components/engine/AnalysisPanel";
+import { GameCodec } from "./components/io/GameCodec";
 import { getDefaultBoardApi } from "./lib/board/api";
 import { sideToColor } from "./lib/board/notation";
 import { getDefaultEngineApi } from "./lib/engine/api";
 import { getDefaultGameApi } from "./lib/game/api";
+import { getDefaultIoApi } from "./lib/io/api";
 import { useEngineStore } from "./stores/useEngineStore";
 import { selectDisplayPosition, useGameStore } from "./stores/useGameStore";
 
@@ -45,6 +47,7 @@ function App() {
   const setComment = useGameStore((state) => state.setComment);
   const setNag = useGameStore((state) => state.setNag);
   const toggleVariation = useGameStore((state) => state.toggleVariation);
+  const adoptSnapshot = useGameStore((state) => state.adoptSnapshot);
   const engineStatus = useEngineStore((state) => state.status);
   const engineId = useEngineStore((state) => state.engineId);
   const engineLines = useEngineStore((state) => state.lines);
@@ -63,6 +66,7 @@ function App() {
   const engineClearPreview = useEngineStore((state) => state.clearPreview);
   const [fenInput, setFenInput] = useState("");
   const [commentDraft, setCommentDraft] = useState("");
+  const [ioApi] = useState(() => getDefaultIoApi());
 
   useEffect(() => {
     void init(getDefaultGameApi(), getDefaultBoardApi());
@@ -285,6 +289,8 @@ function App() {
                 })}
               </div>
             </div>
+
+            <GameCodec ioApi={ioApi} onImported={(snap) => adoptSnapshot(snap)} />
 
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={rotateView}>

@@ -24,7 +24,7 @@
 | 10 | UCI | UCI 协议实现（命令编解码 + info 解析） | P0 | 3 | Done | UCI 编解码单元测试 + Engine Manager 集成测试 | Engine Manager | UCI-Cyclone 坐标；info/bestmove/option 解析 |
 | 11 | MultiPV | 多主变分析展示 | P1 | 3 | Done | AnalysisPanel MultiPV 渲染/切换测试 + 引擎 MultiPV 集成 | UCI、引擎参数 | 支持 1/2/3/5/10；MultiPV 行内并行渲染 |
 | 12 | 引擎参数 | Threads/Hash/MultiPV 等选项读写与持久化 | P1 | 3 | In Progress | setoption 往返测试 + 参数面板测试 | UCI | 读写/UI（Threads/Hash/Depth/MultiPV）完成；持久化待实现 |
-| 13 | 棋谱导入导出 | 通用导入导出框架 + 文件/粘贴/复制入口 | P0 | 2 | Not Started | 框架 + 往返测试 | 各格式适配器 | FEN/PGN/TXT 先行 |
+| 13 | 棋谱导入导出 | 通用导入导出框架 + 文件/粘贴/复制入口 | P0 | 2 | Done | Codec 往返测试（Rust 3 集成）+ GameCodec 组件测试（6 用例） | 各格式适配器 | Codec trait + 自动嗅探 + 粘贴/文件导入 + 复制/下载导出（HTML 文件入口，无新依赖）；TXT 适配器待格式确认 |
 | 14 | XQF | XQF 二进制导入导出 | P1 | 4 | Not Started | 往返 + 样本库 | 格式调研（NEEDS_VERIFICATION） | 先导出后导入 |
 | 15 | PGN | 中国象棋 PGN 导入导出（变例/注释） | P0 | 2 | Done | 往返语义等价（8 集成 + 7 单元用例） | 导入导出框架 | UCI-Cyclone 记谱；中文纵线制导入不支持（NEEDS_VERIFICATION） |
 | 16 | TXT | 中文纵线制文本棋谱导入导出 | P1 | 2 | Not Started | 往返 + 换算边界 | 导入导出框架 | 线性为主 |

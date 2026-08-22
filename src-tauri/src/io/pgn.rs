@@ -367,6 +367,23 @@ fn tokenize(s: &str) -> Result<Vec<Token>, String> {
     Ok(out)
 }
 
+/// 以 `Codec` trait 暴露的 PGN 适配器（见 `io::mod`）。
+pub struct PgnCodec;
+
+impl super::Codec for PgnCodec {
+    fn format(&self) -> super::Format {
+        super::Format::Pgn
+    }
+
+    fn parse(&self, text: &str) -> Result<GameTree, String> {
+        import(text)
+    }
+
+    fn serialize(&self, tree: &GameTree) -> Result<String, String> {
+        Ok(export(tree))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

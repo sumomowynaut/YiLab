@@ -27,6 +27,8 @@ interface GameState {
   expandedVariations: number[];
 
   init: (api: GameApi, boardApi: BoardApi) => Promise<void>;
+  /** 采用导入/命令返回的快照（导入导出用）。 */
+  adoptSnapshot: (snapshot: GameSnapshot) => void;
   handleSquareClick: (sq: Square) => Promise<void>;
   toggleEditing: () => Promise<void>;
   setTool: (tool: Tool) => void;
@@ -88,6 +90,8 @@ export const useGameStore = create<GameState>((set, get) => {
         set({ message: String(error) });
       }
     },
+
+    adoptSnapshot: (snapshot) => applySnapshot(snapshot),
 
     async handleSquareClick(sq) {
       const { api, boardApi, editing, selected, legalTargets, tool } = get();

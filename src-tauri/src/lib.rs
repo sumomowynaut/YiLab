@@ -64,7 +64,9 @@ pub fn run() {
             commands::pgn_export,
             commands::book_lookup,
             commands::book_recommend,
-            commands::book_auto_move
+            commands::book_auto_move,
+            commands::io_import,
+            commands::io_export
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -494,3 +494,27 @@ pub struct BookAutoMoveDto {
     pub applied: Option<String>,
     pub snapshot: GameSnapshot,
 }
+
+// ===================== 导入导出（I/O）命令 =====================
+
+/// 从文本导入棋谱（format: pgn / fen；空 format 时按内容嗅探）。
+#[tauri::command]
+pub fn io_import(format: String, text: String) -> Result<GameSnapshot, String> {
+    let format = if format.trim().is_empty() {
+        crate::io::sniff(&text)
+    } else {
+        crate::io::Format::from_name(&format).ok_or_else(|| format!("未知格式：{format}"))?
+    };
+    let tree = crate::io::codec(format).parse(&text)?;
+    *game_tree().lock().map_err(game_err)? = tree;
+    game_snapshot_dto(&*game_tree().lock().map_err(game_err)?).map_err(game_err)
+}
+
+/// 导出当前棋谱树为文本（format: pgn / fen）。
+#[tauri::command]
+pub fn io_export(format: String) -> Result<String, String> {
+    let format =
+        crate::io::Format::from_name(&format).ok_or_else(|| format!("未知格式：{format}"))?;
+    let tree = game_tree().lock().map_err(game_err)?;
+    crate::io::codec(format).serialize(&tree)
+}
