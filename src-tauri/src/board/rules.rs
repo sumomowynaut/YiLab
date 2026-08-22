@@ -39,7 +39,7 @@ fn crossed_river(sq: Square, color: Color) -> bool {
 }
 
 /// 单枚棋子的伪合法目标格（不考虑己方王安全）。
-fn piece_targets(pos: &Position, piece: Piece, from: Square) -> Vec<Square> {
+pub(crate) fn piece_targets(pos: &Position, piece: Piece, from: Square) -> Vec<Square> {
     let mut out = Vec::new();
     match piece.kind {
         PieceKind::King => king_targets(from, piece.color, &mut out),
@@ -225,6 +225,135 @@ pub fn find_king(pos: &Position, color: Color) -> Option<Square> {
     None
 }
 
+/// 直接判断 `from` 的棋子 `piece` 是否攻击 `sq`（不构造临时 Vec，M3）。
+///
+/// 与 `piece_targets(pos, piece, from).contains(&sq)` 语义等价（由等价性测试保证）。
+pub fn attacks_square(pos: &Position, piece: Piece, from: Square, sq: Square) -> bool {
+    if from == sq {
+        return false;
+    }
+    // 己方棋子占据的目标格不算攻击（与伪合法走法一致）
+    if let Some(occupant) = pos.board[sq.rank as usize][sq.file as usize] {
+        if occupant.color == piece.color {
+            return false;
+        }
+    }
+    match piece.kind {
+        PieceKind::King => adjacent_orthogonal(from, sq) && in_palace(sq, piece.color),
+        PieceKind::Advisor => diagonal_step(from, sq) && in_palace(sq, piece.color),
+        PieceKind::Elephant => {
+            if !diagonal_2(from, sq) {
+                return false;
+            }
+            let (min_rank, max_rank) = elephant_rank_range(piece.color);
+            if sq.rank < min_rank || sq.rank > max_rank {
+                return false;
+            }
+            let eye = midpoint(from, sq);
+            pos.board[eye.rank as usize][eye.file as usize].is_none()
+        }
+        PieceKind::Horse => {
+            let (dr, df) = delta(from, sq);
+            if !knight_step(dr, df) {
+                return false;
+            }
+            let leg = square_at(from, dr / 2, df / 2).expect("leg is on board");
+            pos.board[leg.rank as usize][leg.file as usize].is_none()
+        }
+        PieceKind::Rook => same_line(from, sq) && line_clear_between(pos, from, sq),
+        PieceKind::Cannon => {
+            if !same_line(from, sq) {
+                return false;
+            }
+            let count = between_count(pos, from, sq);
+            if count == 0 {
+                pos.board[sq.rank as usize][sq.file as usize].is_none()
+            } else {
+                count == 1 && pos.board[sq.rank as usize][sq.file as usize].is_some()
+            }
+        }
+        PieceKind::Pawn => pawn_attacks(from, piece.color, sq),
+    }
+}
+
+fn same_line(a: Square, b: Square) -> bool {
+    a.rank == b.rank || a.file == b.file
+}
+
+fn adjacent_orthogonal(a: Square, b: Square) -> bool {
+    (a.rank as i8 - b.rank as i8).abs() + (a.file as i8 - b.file as i8).abs() == 1
+}
+
+fn diagonal_step(a: Square, b: Square) -> bool {
+    (a.rank as i8 - b.rank as i8).abs() == 1 && (a.file as i8 - b.file as i8).abs() == 1
+}
+
+fn diagonal_2(a: Square, b: Square) -> bool {
+    (a.rank as i8 - b.rank as i8).abs() == 2 && (a.file as i8 - b.file as i8).abs() == 2
+}
+
+fn knight_step(dr: i8, df: i8) -> bool {
+    (dr.abs() == 2 && df.abs() == 1) || (dr.abs() == 1 && df.abs() == 2)
+}
+
+fn delta(from: Square, sq: Square) -> (i8, i8) {
+    (
+        sq.rank as i8 - from.rank as i8,
+        sq.file as i8 - from.file as i8,
+    )
+}
+
+fn midpoint(a: Square, b: Square) -> Square {
+    Square::new((a.rank + b.rank) / 2, (a.file + b.file) / 2).expect("midpoint is on board")
+}
+
+/// 同行/同列两个格子之间是否全空（不含两端）。
+fn line_clear_between(pos: &Position, a: Square, b: Square) -> bool {
+    between_count(pos, a, b) == 0
+}
+
+/// 同行/同列两个格子之间被占据的格子数（不含两端）。
+fn between_count(pos: &Position, a: Square, b: Square) -> usize {
+    if a.rank == b.rank {
+        let (lo, hi) = if a.file < b.file {
+            (a.file, b.file)
+        } else {
+            (b.file, a.file)
+        };
+        (lo + 1..hi)
+            .filter(|f| pos.board[a.rank as usize][*f as usize].is_some())
+            .count()
+    } else if a.file == b.file {
+        let (lo, hi) = if a.rank < b.rank {
+            (a.rank, b.rank)
+        } else {
+            (b.rank, a.rank)
+        };
+        (lo + 1..hi)
+            .filter(|r| pos.board[*r as usize][a.file as usize].is_some())
+            .count()
+    } else {
+        0
+    }
+}
+
+fn pawn_attacks(from: Square, color: Color, sq: Square) -> bool {
+    let fwd: i8 = match color {
+        Color::Red => 1,
+        Color::Black => -1,
+    };
+    if sq.rank as i8 == from.rank as i8 + fwd && sq.file == from.file {
+        return true;
+    }
+    if crossed_river(from, color)
+        && sq.rank == from.rank
+        && (sq.file as i8 - from.file as i8).abs() == 1
+    {
+        return true;
+    }
+    false
+}
+
 /// 判断 `sq` 是否被 `by` 一方攻击。
 ///
 /// 包含「飞将」规则：两将同列且中间无子，视作互相攻击。
@@ -243,7 +372,7 @@ pub fn is_attacked(pos: &Position, sq: Square, by: Color) -> bool {
                 continue;
             }
             let from = Square::new(rank, file).expect("in-bounds square");
-            if piece_targets(pos, piece, from).contains(&sq) {
+            if attacks_square(pos, piece, from, sq) {
                 return true;
             }
         }

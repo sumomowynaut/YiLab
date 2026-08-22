@@ -2,7 +2,8 @@
 
 use super::fen::{parse_fen, to_fen};
 use super::rules::{
-    apply_move, is_checkmate, is_in_check, is_stalemate, legal_moves, make_unchecked, perft,
+    apply_move, attacks_square, is_checkmate, is_in_check, is_stalemate, legal_moves,
+    make_unchecked, perft, piece_targets,
 };
 use super::transform::{mirrored, rotated_180};
 use super::types::{Color, Move, PieceKind, Position, Square, START_FEN};
@@ -528,4 +529,50 @@ fn startpos_red_moves_and_make_round_trip() {
     let next2 = make_unchecked(&next, mv2);
     assert_eq!(next2.side_to_move, Color::Red);
     assert_eq!(next2.fullmove_number, 2);
+}
+// ---------- attacks_square 与 piece_targets 等价（M3） ----------
+
+#[test]
+fn attacks_square_matches_piece_targets() {
+    // M3：attacks_square 不得与既有走法生成逻辑产生分歧
+    let fens = [
+        START_FEN,
+        "r3k4/9/9/9/9/9/9/9/9/3K5 b - - 0 1",
+        "4k4/3R1R3/9/9/9/9/9/9/9/3K5 b - - 0 1",
+        "4k4/9/9/9/4C4/4r4/4p4/4p4/9/3K5 w - - 0 1",
+        "4k4/9/9/3p5/3N5/9/9/9/9/3K5 w - - 0 1",
+        "4k4/9/9/9/9/9/3a5/2B6/9/3K5 w - - 0 1",
+    ];
+    for fen in fens {
+        let p = pos(fen);
+        // 与「走法目标（含己方过滤）」逐起点对比；攻击判断与行棋方无关
+        for rank in 0..10u8 {
+            for file in 0..9u8 {
+                let Some(piece) = p.board[rank as usize][file as usize] else {
+                    continue;
+                };
+                let from = Square::new(rank, file).unwrap();
+                let reachable: std::collections::HashSet<Square> = piece_targets(&p, piece, from)
+                    .into_iter()
+                    .filter(|sq| {
+                        p.board[sq.rank as usize][sq.file as usize]
+                            .is_none_or(|o| o.color != piece.color)
+                    })
+                    .collect();
+                for t_rank in 0..10u8 {
+                    for t_file in 0..9u8 {
+                        let sq = Square::new(t_rank, t_file).unwrap();
+                        assert_eq!(
+                            attacks_square(&p, piece, from, sq),
+                            reachable.contains(&sq),
+                            "{} {}->{} 不一致",
+                            fen,
+                            from.uci(),
+                            sq.uci()
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

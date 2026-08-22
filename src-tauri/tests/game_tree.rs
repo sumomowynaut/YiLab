@@ -1,9 +1,10 @@
-//! 棋谱树集成测试：Root/MoveNode/主线/变例/嵌套变例/撤销重做/导航/注释/NAG/恢复局面。
+//! 棋谱树集成测试：Root/MoveNode/主线/变例/嵌套变例/撤销重做/导航/注释/NAG/恢复局面/序列化/变例提升与排序。
 
-use pikaxiangqi_lib::board::fen::to_fen;
+use pikaxiangqi_lib::board::fen::{parse_fen, to_fen};
 use pikaxiangqi_lib::board::types::{Move, START_FEN};
 use pikaxiangqi_lib::game::dto;
 use pikaxiangqi_lib::game::nag::Nag;
+use pikaxiangqi_lib::game::serialize;
 use pikaxiangqi_lib::game::tree::{GameError, GameTree};
 
 fn tree() -> GameTree {
@@ -119,6 +120,8 @@ fn nested_variations() {
     assert!(!t.is_variation(t.current));
 }
 
+// ---------- 恢复局面 / 缓存元数据（H3） ----------
+
 #[test]
 fn restore_position_matches_cached_fen() {
     let mut t = tree();
@@ -134,6 +137,27 @@ fn restore_position_matches_cached_fen() {
     }
     // 根节点恢复为起始局面
     assert_eq!(to_fen(&t.restore_position(t.root).unwrap()), START_FEN);
+}
+
+#[test]
+fn cached_metadata_matches_derived_position() {
+    // H3：节点缓存 side_to_move / fullmove_number 必须与局面一致，快照无需逐节点 parse_fen
+    let mut t = tree();
+    let seq = ["h2e2", "h7e7", "h0g2", "b9c7", "b0c2", "c7e8"];
+    let ids = insert_seq(&mut t, &seq);
+    for id in ids {
+        let n = t.node(id).unwrap();
+        let p = parse_fen(&n.fen).unwrap();
+        assert_eq!(n.side_to_move, p.side_to_move, "节点 {id} 走子方缓存不一致");
+        assert_eq!(
+            n.fullmove_number, p.fullmove_number,
+            "节点 {id} 回合数缓存不一致"
+        );
+    }
+    let root = t.node(t.root).unwrap();
+    let rp = parse_fen(&root.fen).unwrap();
+    assert_eq!(root.side_to_move, rp.side_to_move);
+    assert_eq!(root.fullmove_number, rp.fullmove_number);
 }
 
 #[test]
@@ -231,7 +255,7 @@ fn go_to_start_and_end() {
     let _ = (n1, n2);
 }
 
-// ---------- DeleteVariation ----------
+// ---------- DeleteVariation / Promote / Reorder（M2） ----------
 
 #[test]
 fn delete_variation_removes_subtree() {
@@ -273,35 +297,103 @@ fn delete_variation_keeps_current_when_outside() {
     assert_eq!(t.current, n1);
 }
 
-// ---------- Comments / Annotations ----------
+#[test]
+fn promote_variation_moves_to_main_line() {
+    let mut t = tree();
+    let m = t.insert_move(mv("h2e2")).unwrap();
+    t.go_to_start().unwrap();
+    let v1 = t.insert_move(mv("b0c2")).unwrap();
+    t.go_to_start().unwrap();
+    let v2 = t.insert_move(mv("a0a1")).unwrap(); // 车一进一
+    let root = t.root;
+    assert_eq!(t.node(root).unwrap().children, vec![m, v1, v2]);
+    // 提升 v1 为主线
+    t.promote_variation(v1).unwrap();
+    assert_eq!(t.node(root).unwrap().children, vec![v1, m, v2]);
+    assert!(!t.is_variation(v1));
+    assert!(t.is_variation(m));
+    // 提升主线本身应报错
+    assert!(matches!(
+        t.promote_variation(v1),
+        Err(GameError::NotAVariation(_))
+    ));
+}
 
 #[test]
-fn comments_are_stored_and_editable() {
+fn reorder_variation_moves_up_and_down() {
     let mut t = tree();
-    t.insert_move(mv("h2e2")).unwrap();
-    t.set_comment("中炮开局".to_string()).unwrap();
-    assert_eq!(t.node(t.current).unwrap().comment, "中炮开局");
-    t.set_comment("修改后".to_string()).unwrap();
-    assert_eq!(t.node(t.current).unwrap().comment, "修改后");
+    let m = t.insert_move(mv("h2e2")).unwrap();
+    t.go_to_start().unwrap();
+    let v1 = t.insert_move(mv("b0c2")).unwrap();
+    t.go_to_start().unwrap();
+    let v2 = t.insert_move(mv("a0a1")).unwrap();
+    t.go_to_start().unwrap();
+    let v3 = t.insert_move(mv("i0i1")).unwrap(); // 车九进一（合法）
+    let root = t.root;
+    assert_eq!(t.node(root).unwrap().children, vec![m, v1, v2, v3]);
+    // v2（index 2）上移 → index 1
+    t.reorder_variation(root, 2, 1).unwrap();
+    assert_eq!(t.node(root).unwrap().children, vec![m, v2, v1, v3]);
+    // v1（index 2）下移 → index 3
+    t.reorder_variation(root, 2, 3).unwrap();
+    assert_eq!(t.node(root).unwrap().children, vec![m, v2, v3, v1]);
+    // 越界报错
+    assert!(matches!(
+        t.reorder_variation(root, 1, 9),
+        Err(GameError::InvalidIndex { .. })
+    ));
+    // 不允许移动主线（index 0）
+    assert!(matches!(
+        t.reorder_variation(root, 0, 1),
+        Err(GameError::InvalidIndex { .. })
+    ));
+}
+
+// ---------- Comments / Annotations（H1：按节点定位） ----------
+
+#[test]
+fn comments_are_stored_and_editable_by_node() {
+    let mut t = tree();
+    let n1 = t.insert_move(mv("h2e2")).unwrap();
+    t.set_comment_at(n1, "中炮开局".to_string()).unwrap();
+    assert_eq!(t.node(n1).unwrap().comment, "中炮开局");
+    t.set_comment_at(n1, "修改后".to_string()).unwrap();
+    assert_eq!(t.node(n1).unwrap().comment, "修改后");
     t.set_comment_at(t.root, "根注释".to_string()).unwrap();
     assert_eq!(t.node(t.root).unwrap().comment, "根注释");
 }
 
 #[test]
-fn nags_are_added_removed_and_deduplicated() {
+fn nags_are_added_removed_and_deduplicated_by_node() {
     let mut t = tree();
-    t.insert_move(mv("h2e2")).unwrap();
-    t.add_nag(Nag::Good).unwrap();
-    t.add_nag(Nag::Good).unwrap();
-    t.add_nag(Nag::Interesting).unwrap();
-    let n = t.node(t.current).unwrap();
-    assert_eq!(n.nags, vec![Nag::Good, Nag::Interesting]);
-    t.remove_nag(Nag::Good).unwrap();
-    assert_eq!(t.node(t.current).unwrap().nags, vec![Nag::Interesting]);
-    t.set_nag(Nag::Interesting, false).unwrap();
-    assert!(t.node(t.current).unwrap().nags.is_empty());
-    t.set_nag(Nag::Brilliant, true).unwrap();
-    assert_eq!(t.node(t.current).unwrap().nags, vec![Nag::Brilliant]);
+    let n1 = t.insert_move(mv("h2e2")).unwrap();
+    t.set_nag_at(n1, Nag::Good, true).unwrap();
+    t.set_nag_at(n1, Nag::Good, true).unwrap();
+    t.set_nag_at(n1, Nag::Interesting, true).unwrap();
+    assert_eq!(t.node(n1).unwrap().nags, vec![Nag::Good, Nag::Interesting]);
+    t.set_nag_at(n1, Nag::Good, false).unwrap();
+    assert_eq!(t.node(n1).unwrap().nags, vec![Nag::Interesting]);
+    t.set_nag_at(n1, Nag::Interesting, false).unwrap();
+    assert!(t.node(n1).unwrap().nags.is_empty());
+    t.set_nag_at(n1, Nag::Brilliant, true).unwrap();
+    assert_eq!(t.node(n1).unwrap().nags, vec![Nag::Brilliant]);
+}
+
+#[test]
+fn comment_written_to_explicit_node_survives_navigation() {
+    // H1 回归：节点 A 输入注释 → 导航到节点 B → A 的注释仍写入 A，B 不会错误获得
+    let mut t = tree();
+    let a = t.insert_move(mv("h2e2")).unwrap();
+    let b = t.insert_move(mv("h7e7")).unwrap();
+    // 导航到 B 之后再按节点 A 写注释（模拟 setComment 与 navigate 乱序）
+    t.set_current(b).unwrap();
+    t.set_comment_at(a, "A 的注释".to_string()).unwrap();
+    assert_eq!(t.node(a).unwrap().comment, "A 的注释");
+    assert_eq!(t.node(b).unwrap().comment, "");
+    // NAG 同理
+    t.set_nag_at(a, Nag::Good, true).unwrap();
+    assert_eq!(t.node(a).unwrap().nags, vec![Nag::Good]);
+    assert!(t.node(b).unwrap().nags.is_empty());
 }
 
 // ---------- Snapshot DTO ----------
@@ -311,8 +403,8 @@ fn snapshot_contains_tree_and_current_state() {
     let mut t = tree();
     let ids = insert_seq(&mut t, &["h2e2", "h7e7"]);
     t.set_current(ids[0]).unwrap();
-    t.set_comment("测试注释".to_string()).unwrap();
-    t.add_nag(Nag::Interesting).unwrap();
+    t.set_comment_at(ids[0], "测试注释".to_string()).unwrap();
+    t.set_nag_at(ids[0], Nag::Interesting, true).unwrap();
     let snap = dto::snapshot(&t).unwrap();
     assert_eq!(snap.current_id, ids[0]);
     assert_eq!(snap.comment, "测试注释");
@@ -340,4 +432,74 @@ fn snapshot_black_move_number_is_round_one() {
     let black = &snap.tree.children[0].children[0];
     assert_eq!(black.move_number, 1);
     assert!(!black.is_red);
+}
+
+// ---------- 文档序列化（H2） ----------
+
+#[test]
+fn tree_json_round_trip_preserves_document_not_session() {
+    let mut t = tree();
+    let a = t.insert_move(mv("h2e2")).unwrap();
+    t.set_comment_at(a, "中炮".to_string()).unwrap();
+    t.set_nag_at(a, Nag::Good, true).unwrap();
+    let b = t.insert_move(mv("h7e7")).unwrap();
+    // 根下加一支变例
+    t.go_to_start().unwrap();
+    let v = t.insert_move(mv("b0c2")).unwrap();
+    // 让会话状态非默认：current 回到 a，redo_stack 非空
+    t.set_current(a).unwrap();
+    t.undo().unwrap(); // current = root, redo_stack = [a]
+    assert!(t.redo_available());
+    assert_ne!(t.current, b);
+
+    let json = serialize::to_tree_json(&t).unwrap();
+    // 文档 JSON 不得包含会话状态字段
+    assert!(!json.contains("current"));
+    assert!(!json.contains("redo"));
+    assert!(!json.contains("redoStack"));
+
+    // 重新导入：结构一致，但会话状态重置
+    let t2 = serialize::from_tree_json(&json).unwrap();
+    assert_eq!(t2.root, t.root);
+    assert_eq!(t2.startpos, t.startpos);
+    // 主线/变例结构与注释一致
+    assert_eq!(t2.main_line(), vec![t2.root, a, b]);
+    let root_children = t2.node(t2.root).unwrap().children.clone();
+    assert_eq!(root_children, vec![a, v]);
+    assert_eq!(t2.node(a).unwrap().comment, "中炮");
+    assert_eq!(t2.node(a).unwrap().nags, vec![Nag::Good]);
+    // 会话状态重置
+    assert_eq!(t2.current, t2.root);
+    assert!(!t2.redo_available());
+    // 导出再导出：文档规范一致（不含会话状态）
+    let json2 = serialize::to_tree_json(&t2).unwrap();
+    assert_eq!(json2, json);
+}
+
+#[test]
+fn tree_json_rejects_malformed_documents() {
+    let mut t = tree();
+    t.insert_move(mv("h2e2")).unwrap();
+    let json = serialize::to_tree_json(&t).unwrap();
+
+    // 孤儿节点：给节点 1 追加一个不存在的子节点
+    let mut value: serde_json::Value = serde_json::from_str(&json).unwrap();
+    value["nodes"]["1"]["children"]
+        .as_array_mut()
+        .unwrap()
+        .push(serde_json::json!(99));
+    let broken = serde_json::to_string(&value).unwrap();
+    assert!(serialize::from_tree_json(&broken).is_err());
+
+    // 坏版本
+    let mut value = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+    value["version"] = serde_json::json!(99);
+    let bad_version = serde_json::to_string(&value).unwrap();
+    assert!(serialize::from_tree_json(&bad_version).is_err());
+
+    // 坏 FEN
+    let mut value = serde_json::from_str::<serde_json::Value>(&json).unwrap();
+    value["startpos"] = serde_json::json!("not-a-fen");
+    let bad_fen = serde_json::to_string(&value).unwrap();
+    assert!(serialize::from_tree_json(&bad_fen).is_err());
 }

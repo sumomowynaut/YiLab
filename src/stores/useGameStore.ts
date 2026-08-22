@@ -15,7 +15,8 @@ interface GameState {
   api: GameApi | null;
   boardApi: BoardApi | null;
   snapshot: GameSnapshot | null;
-  position: PositionSnapshot | null;
+  /** 编辑模式下的独立摆棋缓冲（M1）；非编辑状态以 snapshot.position 为准。 */
+  editPosition: PositionSnapshot | null;
   validation: ValidationResult | null;
   selected: Square | null;
   legalTargets: Square[];
@@ -42,16 +43,22 @@ interface GameState {
   goToStart: () => Promise<void>;
   goToEnd: () => Promise<void>;
   deleteVariation: (nodeId: number) => Promise<void>;
-  setComment: (comment: string) => Promise<void>;
-  setNag: (nag: string, add: boolean) => Promise<void>;
+  promoteVariation: (nodeId: number) => Promise<void>;
+  reorderVariation: (parentId: number, from: number, to: number) => Promise<void>;
+  setComment: (nodeId: number, comment: string) => Promise<void>;
+  setNag: (nodeId: number, nag: string, add: boolean) => Promise<void>;
   toggleVariation: (nodeId: number) => void;
+}
+
+/** 当前展示的局面：编辑模式用 editPosition，否则由 snapshot.position 派生（M1）。 */
+export function selectDisplayPosition(state: GameState): PositionSnapshot | null {
+  return state.editing ? state.editPosition : (state.snapshot?.position ?? null);
 }
 
 export const useGameStore = create<GameState>((set, get) => {
   function applySnapshot(snapshot: GameSnapshot) {
     set({
       snapshot,
-      position: snapshot.position,
       selected: null,
       legalTargets: [],
       message: null,
@@ -62,7 +69,7 @@ export const useGameStore = create<GameState>((set, get) => {
     api: null,
     boardApi: null,
     snapshot: null,
-    position: null,
+    editPosition: null,
     validation: null,
     selected: null,
     legalTargets: [],
@@ -83,7 +90,8 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     async handleSquareClick(sq) {
-      const { api, boardApi, position, selected, legalTargets, editing, tool } = get();
+      const { api, boardApi, editing, selected, legalTargets, tool } = get();
+      const position = selectDisplayPosition(get());
       if (!api || !boardApi || !position) {
         return;
       }
@@ -96,7 +104,7 @@ export const useGameStore = create<GameState>((set, get) => {
                 ? await boardApi.setPiece(position.fen, squareToUci(sq), tool.color, tool.kind)
                 : null;
           if (result) {
-            set({ position: result.position, validation: result.validation, message: null });
+            set({ editPosition: result.position, validation: result.validation, message: null });
           }
         } catch (error) {
           set({ message: String(error) });
@@ -139,14 +147,15 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     async toggleEditing() {
-      const { api, editing, position } = get();
-      if (editing && api && position) {
+      const { api, editing, snapshot } = get();
+      if (editing && api && snapshot) {
         // 退出编辑：以编辑后的局面作为新棋谱树根
+        const editPosition = get().editPosition ?? snapshot.position;
         try {
-          const snapshot = await api.newGame(position.fen);
+          const next = await api.newGame(editPosition.fen);
           set({
-            snapshot,
-            position: snapshot.position,
+            snapshot: next,
+            editPosition: null,
             editing: false,
             selected: null,
             legalTargets: [],
@@ -158,31 +167,40 @@ export const useGameStore = create<GameState>((set, get) => {
         }
         return;
       }
-      set({ editing: !editing, selected: null, legalTargets: [], validation: null });
+      if (snapshot) {
+        set({
+          editing: true,
+          editPosition: snapshot.position,
+          selected: null,
+          legalTargets: [],
+          validation: null,
+        });
+      }
     },
 
     setTool: (tool) => set({ tool }),
 
     async clearAll() {
-      const { boardApi, position } = get();
-      if (!boardApi || !position) return;
+      const { boardApi, editing } = get();
+      if (!boardApi || !editing) return;
       try {
         const result = await boardApi.clearAll();
-        set({ position: result.position, validation: result.validation, message: null });
+        set({ editPosition: result.position, validation: result.validation, message: null });
       } catch (error) {
         set({ message: String(error) });
       }
     },
 
     async toggleSide() {
-      const { boardApi, position } = get();
-      if (!boardApi || !position) return;
+      const { boardApi, editing } = get();
+      const position = selectDisplayPosition(get());
+      if (!boardApi || !editing || !position) return;
       try {
         const result = await boardApi.setSide(
           position.fen,
           position.sideToMove === "w" ? "b" : "w",
         );
-        set({ position: result.position, validation: result.validation, message: null });
+        set({ editPosition: result.position, validation: result.validation, message: null });
       } catch (error) {
         set({ message: String(error) });
       }
@@ -285,21 +303,41 @@ export const useGameStore = create<GameState>((set, get) => {
       }
     },
 
-    async setComment(comment) {
+    async promoteVariation(nodeId) {
       const { api } = get();
       if (!api) return;
       try {
-        applySnapshot(await api.setComment(comment));
+        applySnapshot(await api.promoteVariation(nodeId));
       } catch (error) {
         set({ message: String(error) });
       }
     },
 
-    async setNag(nag, add) {
+    async reorderVariation(parentId, from, to) {
       const { api } = get();
       if (!api) return;
       try {
-        applySnapshot(await api.setNag(nag, add));
+        applySnapshot(await api.reorderVariation(parentId, from, to));
+      } catch (error) {
+        set({ message: String(error) });
+      }
+    },
+
+    async setComment(nodeId, comment) {
+      const { api } = get();
+      if (!api) return;
+      try {
+        applySnapshot(await api.setComment(nodeId, comment));
+      } catch (error) {
+        set({ message: String(error) });
+      }
+    },
+
+    async setNag(nodeId, nag, add) {
+      const { api } = get();
+      if (!api) return;
+      try {
+        applySnapshot(await api.setNag(nodeId, nag, add));
       } catch (error) {
         set({ message: String(error) });
       }

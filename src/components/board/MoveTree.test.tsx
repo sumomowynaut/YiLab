@@ -55,6 +55,16 @@ function makeTree(): TreeNodeDto {
           },
         ],
       },
+      {
+        id: 5,
+        mv: "a0a1",
+        moveNumber: 1,
+        isRed: true,
+        comment: "",
+        nags: [],
+        isVariation: true,
+        children: [],
+      },
     ],
   };
 }
@@ -67,6 +77,8 @@ function renderTree(overrides: Partial<Parameters<typeof MoveTree>[0]> = {}) {
     onNavigate: vi.fn(),
     onToggleVariation: vi.fn(),
     onDeleteVariation: vi.fn(),
+    onPromoteVariation: vi.fn(),
+    onReorderVariation: vi.fn(),
     ...overrides,
   };
   render(
@@ -77,6 +89,8 @@ function renderTree(overrides: Partial<Parameters<typeof MoveTree>[0]> = {}) {
       onNavigate={props.onNavigate}
       onToggleVariation={props.onToggleVariation}
       onDeleteVariation={props.onDeleteVariation}
+      onPromoteVariation={props.onPromoteVariation}
+      onReorderVariation={props.onReorderVariation}
     />,
   );
   return props;
@@ -88,7 +102,7 @@ describe("MoveTree", () => {
     expect(screen.getByTestId("move-1")).toHaveTextContent("1.");
     expect(screen.getByTestId("move-1")).toHaveTextContent("h2e2");
     expect(screen.getByTestId("move-2")).toHaveTextContent("1…");
-    expect(screen.getByTestId("variation-toggle-0")).toHaveTextContent("变例 1");
+    expect(screen.getByTestId("variation-toggle-0")).toHaveTextContent("变例 2");
   });
 
   it("highlights the current move", () => {
@@ -116,11 +130,25 @@ describe("MoveTree", () => {
     expect(props.onToggleVariation).toHaveBeenCalledWith(0);
   });
 
-  it("renders expanded variation with delete button", () => {
+  it("renders expanded variation with delete/promote/reorder buttons", () => {
     const props = renderTree({ expanded: [0] });
     expect(screen.getByTestId("variation-3")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("delete-variation-3"));
     expect(props.onDeleteVariation).toHaveBeenCalledWith(3);
+    fireEvent.click(screen.getByTestId("promote-variation-3"));
+    expect(props.onPromoteVariation).toHaveBeenCalledWith(3);
+  });
+
+  it("reorders variations up and down", () => {
+    const props = renderTree({ expanded: [0] });
+    // 变例 3 是第一条变例（index 0）：上移禁用，下移 → (0, 1, 2)
+    expect(screen.getByTestId("reorder-variation-3-up")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("reorder-variation-3-down"));
+    expect(props.onReorderVariation).toHaveBeenCalledWith(0, 1, 2);
+    // 变例 5 是第二条变例（index 1）：上移 → (0, 2, 1)，下移禁用
+    fireEvent.click(screen.getByTestId("reorder-variation-5-up"));
+    expect(props.onReorderVariation).toHaveBeenCalledWith(0, 2, 1);
+    expect(screen.getByTestId("reorder-variation-5-down")).toBeDisabled();
   });
 
   it("shows empty state when no moves", () => {

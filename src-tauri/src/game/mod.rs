@@ -4,6 +4,7 @@
 
 pub mod dto;
 pub mod nag;
+pub mod serialize;
 pub mod tree;
 
 pub use nag::Nag;

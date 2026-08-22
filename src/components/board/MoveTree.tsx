@@ -8,6 +8,8 @@ export interface MoveTreeProps {
   onNavigate: (nodeId: number) => void;
   onToggleVariation: (nodeId: number) => void;
   onDeleteVariation: (nodeId: number) => void;
+  onPromoteVariation: (nodeId: number) => void;
+  onReorderVariation: (parentId: number, from: number, to: number) => void;
 }
 
 function MoveChip({
@@ -49,28 +51,35 @@ function MoveChip({
   );
 }
 
-function renderLine(
-  start: TreeNodeDto,
-  currentId: number,
-  expanded: number[],
-  onNavigate: (id: number) => void,
-  onToggleVariation: (id: number) => void,
-  onDeleteVariation: (id: number) => void,
-): ReactNode[] {
+interface RenderContext {
+  currentId: number;
+  expanded: number[];
+  onNavigate: (id: number) => void;
+  onToggleVariation: (id: number) => void;
+  onDeleteVariation: (id: number) => void;
+  onPromoteVariation: (id: number) => void;
+  onReorderVariation: (parentId: number, from: number, to: number) => void;
+}
+
+function renderLine(start: TreeNodeDto, ctx: RenderContext): ReactNode[] {
   const out: ReactNode[] = [];
   let node: TreeNodeDto | null = start;
   while (node) {
     const current: TreeNodeDto = node;
     const variations = current.children.slice(1);
-    const expandedHere = expanded.includes(current.id);
+    const expandedHere = ctx.expanded.includes(current.id);
     out.push(
       <span key={current.id} className="inline-flex flex-wrap items-center gap-1">
-        <MoveChip node={current} isCurrent={current.id === currentId} onNavigate={onNavigate} />
+        <MoveChip
+          node={current}
+          isCurrent={current.id === ctx.currentId}
+          onNavigate={ctx.onNavigate}
+        />
         {variations.length > 0 && (
           <button
             type="button"
             data-testid={`variation-toggle-${current.id}`}
-            onClick={() => onToggleVariation(current.id)}
+            onClick={() => ctx.onToggleVariation(current.id)}
             className="inline-flex items-center gap-0.5 rounded border border-dashed px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent"
           >
             <span aria-hidden>{expandedHere ? "▾" : "▸"}</span>变例 {variations.length}
@@ -85,36 +94,65 @@ function renderLine(
           key={`variations-${current.id}`}
           className="flex flex-col gap-1 border-l border-dashed pl-2"
         >
-          {variations.map((variation, index) => (
-            <div
-              key={variation.id}
-              data-testid={`variation-${variation.id}`}
-              className="flex flex-col gap-0.5"
-            >
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>变例 {index + 1}</span>
-                <button
-                  type="button"
-                  data-testid={`delete-variation-${variation.id}`}
-                  aria-label={`删除变例 ${variation.id}`}
-                  onClick={() => onDeleteVariation(variation.id)}
-                  className="rounded px-1 text-red-500 hover:bg-red-50"
-                >
-                  🗑
-                </button>
+          {variations.map((variation, index) => {
+            const canUp = index > 0;
+            const canDown = index < variations.length - 1;
+            return (
+              <div
+                key={variation.id}
+                data-testid={`variation-${variation.id}`}
+                className="flex flex-col gap-0.5"
+              >
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span>变例 {index + 1}</span>
+                  <button
+                    type="button"
+                    data-testid={`promote-variation-${variation.id}`}
+                    aria-label={`提升变例 ${variation.id} 为主线`}
+                    onClick={() => ctx.onPromoteVariation(variation.id)}
+                    className="rounded px-1 hover:bg-accent"
+                    title="提升为主线"
+                  >
+                    ⭐
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`reorder-variation-${variation.id}-up`}
+                    aria-label={`变例 ${variation.id} 上移`}
+                    onClick={() => ctx.onReorderVariation(current.id, index + 1, index)}
+                    disabled={!canUp}
+                    className="rounded px-1 hover:bg-accent disabled:opacity-30"
+                    title="上移"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`reorder-variation-${variation.id}-down`}
+                    aria-label={`变例 ${variation.id} 下移`}
+                    onClick={() => ctx.onReorderVariation(current.id, index + 1, index + 2)}
+                    disabled={!canDown}
+                    className="rounded px-1 hover:bg-accent disabled:opacity-30"
+                    title="下移"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    data-testid={`delete-variation-${variation.id}`}
+                    aria-label={`删除变例 ${variation.id}`}
+                    onClick={() => ctx.onDeleteVariation(variation.id)}
+                    className="rounded px-1 text-red-500 hover:bg-red-50"
+                  >
+                    🗑
+                  </button>
+                </div>
+                <div className="flex flex-wrap items-center gap-1">
+                  {renderLine(variation, ctx)}
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-1">
-                {renderLine(
-                  variation,
-                  currentId,
-                  expanded,
-                  onNavigate,
-                  onToggleVariation,
-                  onDeleteVariation,
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>,
       );
     }
@@ -124,7 +162,7 @@ function renderLine(
   return out;
 }
 
-/** 棋谱树视图：主线 + 可变例展开/删除、当前棋步高亮、注释标记。 */
+/** 棋谱树视图：主线 + 可变例展开/删除/提升/排序、当前棋步高亮、注释标记。 */
 export function MoveTree({
   tree,
   currentId,
@@ -132,7 +170,18 @@ export function MoveTree({
   onNavigate,
   onToggleVariation,
   onDeleteVariation,
+  onPromoteVariation,
+  onReorderVariation,
 }: MoveTreeProps) {
+  const ctx: RenderContext = {
+    currentId,
+    expanded,
+    onNavigate,
+    onToggleVariation,
+    onDeleteVariation,
+    onPromoteVariation,
+    onReorderVariation,
+  };
   const hasMoves = tree.children.length > 0;
   return (
     <div
@@ -140,9 +189,7 @@ export function MoveTree({
       className="flex max-h-64 flex-col gap-1 overflow-y-auto rounded border p-2"
     >
       {hasMoves ? (
-        <div className="flex flex-wrap items-center gap-1">
-          {renderLine(tree, currentId, expanded, onNavigate, onToggleVariation, onDeleteVariation)}
-        </div>
+        <div className="flex flex-wrap items-center gap-1">{renderLine(tree, ctx)}</div>
       ) : (
         <p className="text-sm text-muted-foreground" data-testid="move-tree-empty">
           尚无着法——点击棋盘走子，或切换「编辑局面」摆棋。

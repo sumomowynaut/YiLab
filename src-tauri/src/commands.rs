@@ -220,19 +220,40 @@ pub fn game_delete_variation(node_id: u64) -> Result<GameSnapshot, String> {
     game_snapshot_dto(&tree).map_err(game_err)
 }
 
-/// 设置当前节点注释。
+/// 设置指定节点注释（H1：修改棋谱节点数据的命令必须显式传 node_id，不依赖 current）。
 #[tauri::command]
-pub fn game_set_comment(comment: String) -> Result<GameSnapshot, String> {
+pub fn game_set_comment(node_id: u64, comment: String) -> Result<GameSnapshot, String> {
     let mut tree = game_tree().lock().map_err(game_err)?;
-    tree.set_comment(comment).map_err(game_err)?;
+    tree.set_comment_at(node_id, comment).map_err(game_err)?;
     game_snapshot_dto(&tree).map_err(game_err)
 }
 
-/// 为当前节点添加/移除注释符号（NAG）。
+/// 为指定节点添加/移除注释符号（NAG，H1：显式 node_id）。
 #[tauri::command]
-pub fn game_set_nag(nag: String, add: bool) -> Result<GameSnapshot, String> {
+pub fn game_set_nag(node_id: u64, nag: String, add: bool) -> Result<GameSnapshot, String> {
     let mut tree = game_tree().lock().map_err(game_err)?;
     let symbol = Nag::from_symbol(&nag).ok_or_else(|| format!("未知注释符号：{nag}"))?;
-    tree.set_nag(symbol, add).map_err(game_err)?;
+    tree.set_nag_at(node_id, symbol, add).map_err(game_err)?;
+    game_snapshot_dto(&tree).map_err(game_err)
+}
+
+/// 把一支变例提升为主线（M2）。
+#[tauri::command]
+pub fn game_promote_variation(node_id: u64) -> Result<GameSnapshot, String> {
+    let mut tree = game_tree().lock().map_err(game_err)?;
+    tree.promote_variation(node_id).map_err(game_err)?;
+    game_snapshot_dto(&tree).map_err(game_err)
+}
+
+/// 调整变例顺序（M2）：把 parent 的 children[from] 移到 children[to]（from/to >= 1）。
+#[tauri::command]
+pub fn game_reorder_variation(
+    parent_id: u64,
+    from: usize,
+    to: usize,
+) -> Result<GameSnapshot, String> {
+    let mut tree = game_tree().lock().map_err(game_err)?;
+    tree.reorder_variation(parent_id, from, to)
+        .map_err(game_err)?;
     game_snapshot_dto(&tree).map_err(game_err)
 }

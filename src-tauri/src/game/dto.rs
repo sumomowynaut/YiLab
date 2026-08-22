@@ -66,15 +66,15 @@ pub fn snapshot(tree: &GameTree) -> Result<GameSnapshot, String> {
 
 fn build_node(tree: &GameTree, id: NodeId) -> Result<TreeNodeDto, String> {
     let n = tree.node(id).map_err(|e| format!("{e}"))?;
+    // 使用插入时缓存的元数据，避免快照时逐节点 parse_fen（H3）。
+    // 红方着法后轮到黑方（side 'b'）；黑方着法后 fullmove 已 +1。
     let (move_number, is_red) = match n.mv {
         Some(_) => {
-            let p = parse_fen(&n.fen)?;
-            // 红方着法后轮到黑方（side 'b'）；黑方着法后 fullmove 已 +1
-            let red = p.side_to_move == Color::Black;
+            let red = n.side_to_move == Color::Black;
             let num = if red {
-                p.fullmove_number
+                n.fullmove_number
             } else {
-                p.fullmove_number.saturating_sub(1).max(1)
+                n.fullmove_number.saturating_sub(1).max(1)
             };
             (num, red)
         }

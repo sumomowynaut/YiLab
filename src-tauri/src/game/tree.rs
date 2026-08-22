@@ -4,15 +4,24 @@
 //! - MoveNode：每个着法一个节点，含父指针与有序子节点。
 //! - MainLine：始终沿 children[0] 行进。
 //! - Variation / Nested Variation：children[1..] 为变例，变例内同样可再分支。
-//! - CurrentNode：`current` 指向当前浏览节点。
 //! - 从任意节点均可通过 `restore_position` 回放父链恢复完整局面。
+//!
+//! # Document State 与 Session State
+//!
+//! - **Document State（棋谱文档数据）**：`startpos`、`root`、`nodes`（含着法/注释/NAG/子节点）、`headers`。
+//!   这些是棋谱的持久化内容，序列化时保留。
+//! - **Session State（会话/导航状态）**：`current`（当前浏览节点）、`redo_stack`（重做栈）。
+//!   这些只属于当前编辑会话，**绝不进入棋谱持久化数据**（见 `game::serialize`）。
+//!
+//! 注意：`current`/`redo_stack` 与文档状态同存于本结构，是为了在当前阶段保持改动最小；
+//! 未来若引入多文档/持久化，应拆分为 `GameSession { tree, current, redo_stack }`。
 
 use std::collections::HashMap;
 use std::fmt;
 
 use crate::board::fen::{parse_fen, to_fen};
 use crate::board::rules::{apply_move, make_unchecked};
-use crate::board::types::{Move, Position};
+use crate::board::types::{Color, Move, Position};
 
 use super::nag::Nag;
 
@@ -26,13 +35,17 @@ pub struct GameNode {
     pub parent: Option<NodeId>,
     /// 本节点局面 FEN（插入时计算并缓存）。
     pub fen: String,
+    /// 本节点局面下「轮到谁走」（缓存，避免快照时逐节点 parse_fen）。
+    pub side_to_move: Color,
+    /// 本节点局面下的回合数（缓存，避免快照时逐节点 parse_fen）。
+    pub fullmove_number: u32,
     pub comment: String,
     pub nags: Vec<Nag>,
     /// 有序子节点；children[0] 为主线续着。
     pub children: Vec<NodeId>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GameHeaders {
     pub title: String,
     pub red: String,
@@ -44,14 +57,18 @@ pub struct GameHeaders {
 
 #[derive(Debug, Clone)]
 pub struct GameTree {
+    /// 【文档】起始局面 FEN。
     pub startpos: String,
+    /// 【文档】根节点 id。
     pub root: NodeId,
+    /// 【文档】节点表。
     pub nodes: HashMap<NodeId, GameNode>,
-    /// 当前浏览节点（CurrentNode）。
+    /// 【会话】当前浏览节点（CurrentNode）。
     pub current: NodeId,
+    /// 【文档】对局元数据。
     pub headers: GameHeaders,
     next_id: NodeId,
-    /// 连续「悔棋」时记录的可重做节点栈。
+    /// 【会话】连续「悔棋」时记录的可重做节点栈。
     redo_stack: Vec<NodeId>,
 }
 
@@ -65,6 +82,11 @@ pub enum GameError {
     NoParent,
     NoNext,
     NothingToRedo,
+    InvalidIndex {
+        parent: NodeId,
+        index: usize,
+        len: usize,
+    },
 }
 
 impl fmt::Display for GameError {
@@ -78,14 +100,36 @@ impl fmt::Display for GameError {
             GameError::NoParent => write!(f, "已到棋谱起点"),
             GameError::NoNext => write!(f, "已到棋谱终点"),
             GameError::NothingToRedo => write!(f, "无可重做"),
+            GameError::InvalidIndex { parent, index, len } => {
+                write!(f, "节点 {parent} 的子节点索引 {index} 越界（共 {len}）")
+            }
         }
     }
 }
 
 impl GameTree {
+    /// 从已构建的文档部件重建棋谱树（用于反序列化）：会话状态重置为根。
+    pub(crate) fn from_document(
+        startpos: String,
+        root: NodeId,
+        nodes: HashMap<NodeId, GameNode>,
+        headers: GameHeaders,
+    ) -> GameTree {
+        let max_id = nodes.keys().copied().max().unwrap_or(root);
+        GameTree {
+            startpos,
+            root,
+            nodes,
+            current: root,
+            headers,
+            next_id: max_id + 1,
+            redo_stack: Vec::new(),
+        }
+    }
+
     /// 以指定起始局面创建新棋谱树（校验 FEN）。
     pub fn new(startpos: &str) -> Result<GameTree, GameError> {
-        parse_fen(startpos).map_err(GameError::InvalidStartFen)?;
+        let start = parse_fen(startpos).map_err(GameError::InvalidStartFen)?;
         let root = 0;
         let mut nodes = HashMap::new();
         nodes.insert(
@@ -95,6 +139,8 @@ impl GameTree {
                 mv: None,
                 parent: None,
                 fen: startpos.to_string(),
+                side_to_move: start.side_to_move,
+                fullmove_number: start.fullmove_number,
                 comment: String::new(),
                 nags: Vec::new(),
                 children: Vec::new(),
@@ -179,6 +225,8 @@ impl GameTree {
                 mv: Some(mv),
                 parent: Some(parent),
                 fen: to_fen(&next),
+                side_to_move: next.side_to_move,
+                fullmove_number: next.fullmove_number,
                 comment: String::new(),
                 nags: Vec::new(),
                 children: Vec::new(),
@@ -210,6 +258,55 @@ impl GameTree {
         if current_inside {
             self.current = parent;
         }
+        self.redo_stack.clear();
+        Ok(())
+    }
+
+    /// 把一支变例提升为主线（移动到其父节点 children[0]）。
+    pub fn promote_variation(&mut self, node: NodeId) -> Result<(), GameError> {
+        if node == self.root {
+            return Err(GameError::CannotDeleteRoot);
+        }
+        let parent = self.node(node)?.parent.ok_or(GameError::CannotDeleteRoot)?;
+        let is_first = self.node(parent)?.children.first() == Some(&node);
+        if is_first {
+            return Err(GameError::NotAVariation(node));
+        }
+        self.node_mut(parent)?.children.retain(|c| *c != node);
+        self.node_mut(parent)?.children.insert(0, node);
+        self.redo_stack.clear();
+        Ok(())
+    }
+
+    /// 调整变例顺序：把 `parent` 的 children[from] 移动到 children[to]。
+    /// `from`/`to` 必须都位于变例区（index >= 1），避免把主线移出首位。
+    pub fn reorder_variation(
+        &mut self,
+        parent: NodeId,
+        from: usize,
+        to: usize,
+    ) -> Result<(), GameError> {
+        let len = self.node(parent)?.children.len();
+        if from >= len || to >= len {
+            return Err(GameError::InvalidIndex {
+                parent,
+                index: if from >= len { from } else { to },
+                len,
+            });
+        }
+        if from == 0 || to == 0 {
+            return Err(GameError::InvalidIndex {
+                parent,
+                index: from.min(to),
+                len,
+            });
+        }
+        if from == to {
+            return Ok(());
+        }
+        let children = &mut self.node_mut(parent)?.children;
+        let node = children.remove(from);
+        children.insert(to, node);
         self.redo_stack.clear();
         Ok(())
     }
@@ -282,36 +379,23 @@ impl GameTree {
         Ok(())
     }
 
-    pub fn set_comment(&mut self, comment: String) -> Result<(), GameError> {
-        self.node_mut(self.current)?.comment = comment;
-        Ok(())
-    }
-
+    /// 按节点 id 设置注释（H1：修改棋谱数据的操作按显式节点定位，不依赖 current）。
     pub fn set_comment_at(&mut self, node: NodeId, comment: String) -> Result<(), GameError> {
         self.node_mut(node)?.comment = comment;
         Ok(())
     }
 
-    pub fn add_nag(&mut self, nag: Nag) -> Result<(), GameError> {
-        let n = self.node_mut(self.current)?;
-        if !n.nags.contains(&nag) {
-            n.nags.push(nag);
-        }
-        Ok(())
-    }
-
-    pub fn remove_nag(&mut self, nag: Nag) -> Result<(), GameError> {
-        let n = self.node_mut(self.current)?;
-        n.nags.retain(|x| *x != nag);
-        Ok(())
-    }
-
-    pub fn set_nag(&mut self, nag: Nag, add: bool) -> Result<(), GameError> {
+    /// 按节点 id 添加/移除 NAG（H1：不依赖 current）。
+    pub fn set_nag_at(&mut self, node: NodeId, nag: Nag, add: bool) -> Result<(), GameError> {
+        let n = self.node_mut(node)?;
         if add {
-            self.add_nag(nag)
+            if !n.nags.contains(&nag) {
+                n.nags.push(nag);
+            }
         } else {
-            self.remove_nag(nag)
+            n.nags.retain(|x| *x != nag);
         }
+        Ok(())
     }
 
     /// 主线：从根沿 children[0] 到叶子。

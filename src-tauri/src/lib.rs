@@ -45,6 +45,8 @@ pub fn run() {
             commands::game_go_to_start,
             commands::game_go_to_end,
             commands::game_delete_variation,
+            commands::game_promote_variation,
+            commands::game_reorder_variation,
             commands::game_set_comment,
             commands::game_set_nag
         ])

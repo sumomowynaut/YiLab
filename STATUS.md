@@ -5,29 +5,43 @@
 
 ## 当前阶段
 
-**Phase 2（Game Tree 棋谱树）✅ 核心完成**
+**Phase 2（Game Tree 棋谱树）✅ 核心完成 + 架构审查修复完成**
 
-- ✅ Rust 棋谱树 `src-tauri/src/game/`：**真正的树结构**（非着法数组）——
-  Root / MoveNode（含父指针与有序子节点）/ MainLine（children[0]）/ Variation / Nested Variation /
-  CurrentNode / Undo（悔棋栈）/ Redo（重做栈）/ InsertMove（合法校验 + 相同着法复用）/ DeleteVariation（整棵子树）/ Navigate /
-  Comments / Annotations（NAG ! ? !! ?? !? ?! = ~）。
-- ✅ **从任意节点回放父链恢复完整 Position**（`restore_position`，与节点缓存 FEN 一致性测试通过）。
-- ✅ Tauri 命令：`game_new / game_snapshot / game_insert_move / game_navigate / game_previous / game_next /
-  game_undo / game_redo / game_go_to_start / game_go_to_end / game_delete_variation / game_set_comment / game_set_nag`。
-- ✅ React Move Tree UI：点击棋步跳转、左右键导航（←/→）、Ctrl+Z/Y 悔棋/重做、
-  Variation 展开/收起、变例删除（🗑）、注释显示（*）与编辑、NAG 按钮、当前棋步高亮、嵌套变例递归渲染。
-- ✅ 测试：Rust 76 个（棋盘 52 + 棋谱树集成 24）、前端 28 个（含 MoveTree 7 个、game store 6 个）。
-- ⛔ 尚未实现：PGN/XQF/东萍 导入导出（Phase 2 收尾）、Pikafish 引擎（Phase 3）、开局库/OCR（Phase 4/5）。
+- ✅ Rust 棋谱树 `src-tauri/src/game/`：真实树结构（Root / MoveNode / MainLine / Variation / Nested Variation / Undo / Redo / InsertMove / DeleteVariation / Navigate / Comments / NAG / Promote / Reorder / 文档序列化）。
+- ✅ 从任意节点回放父链恢复完整 Position（`restore_position`，与缓存 FEN 一致性测试通过）。
+- ✅ React Move Tree UI：点击跳转、←/→ 导航、Ctrl+Z/Y 悔棋/重做、变例展开/删除/**提升主线/上移/下移**、注释显示与编辑、NAG、当前棋步高亮。
+- ✅ 测试：Rust 83（棋盘 53 + 棋谱树集成 30）、前端 30。
+
+### 架构审查修复（本轮，commit `fix: address game tree architecture review`）
+
+**已修复**
+
+| 项 | 内容 |
+|----|------|
+| H1 | 注释/NAG 修改改为**按 node_id 显式定位**（`game_set_comment(node_id, ...)` / `game_set_nag(node_id, ...)`，Rust `set_comment_at`/`set_nag_at`），不再依赖全局 current；附回归测试（节点 A 写注释→导航到 B→注释仍在 A） |
+| H2 | 明确 **Document State**（startpos/root/nodes/headers）与 **Session State**（current/redo_stack）边界；新增 `game::serialize`（tree_json v1）**只序列化文档字段**，导入时校验结构并重置会话状态；往返测试证明 current/redo_stack 不进入持久化 |
+| H3 | `GameNode` 插入时缓存 `side_to_move`/`fullmove_number`，快照 `build_node` 不再逐节点 `parse_fen`；一致性测试保证缓存与局面相符 |
+| M1 | store 非编辑态 position 由 `snapshot.position` 派生（`selectDisplayPosition`），编辑态使用独立 `editPosition`；clearAll/toggleSide 限定编辑态 |
+| M2 | 实现 `promote_variation` / `reorder_variation`（Rust + 命令 + React UI 提升/上移/下移 + 测试） |
+| M3 | 新增 `attacks_square`（免临时 Vec 分配）并接入 `is_attacked`；等价性测试保证与走法生成一致；**perft 44/1920/79666 全部保持通过** |
+
+**暂缓/记录（不强行实现）**
+
+- `GameTree` 拆分为 `GameSession { tree, current, redo_stack }`：当前改动最小方案是保留同结构 + 明确文档/会话边界 + 序列化排除会话字段；拆分记为后续重构项。
+- 全树快照 → 增量/可见范围快照：当前棋谱规模小，暂缓；已在 `docs/architecture.md` 记录。
+- `truncate`：非本轮必要范围，记录为后续 Phase（导入导出时）。
+- store 进一步拆分（`useGameStore`/`useBoardStore` 分离）：记为后续重构项。
+- `apply_move`（`legal_moves().contains`）分配优化：收益低、风险高于收益，记录为后续性能项。
 
 ## 验收命令（全部通过）
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 52 lib + 24 game_tree 集成测试（沙箱需清单变通，见下） |
+| `cargo test` | ✅ | 53 lib + 30 game_tree 集成测试（沙箱需清单变通，见下） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
-| `npm run test` | ✅ | 28 个前端用例 |
+| `npm run test` | ✅ | 30 个前端用例 |
 | `npm run lint` | ✅ | 0 error 0 warning |
 | `npm run format:check` | ✅ | |
 | `npm run build` | ✅ | tsc + vite build |
@@ -62,7 +76,7 @@
 
 ## 下一步（Phase 2 收尾 / Phase 3）
 
-1. Phase 2 收尾：PGN / TXT 导入导出（feature-matrix #13/#15/#16），棋盘→棋谱树联动的进一步完善。
+1. Phase 2 收尾：PGN / TXT 导入导出（feature-matrix #13/#15/#16）；`truncate` 随导入导出落地。
 2. Phase 3：Pikafish 引擎集成（Engine Manager + UCI + MultiPV + 评价曲线）。
 
 ## 关键开放问题（NEEDS_VERIFICATION）
@@ -82,4 +96,5 @@
 | 2026-08-22 | 建立架构文档集、AGENTS.md、STATUS.md、feature-matrix.md；确认 Phase 0 前状态 |
 | 2026-08-22 | Phase 0 完成：Tauri 2 + React/TS + Rust 骨架、Tailwind/shadcn/ui、Zustand、测试、ESLint/Prettier/rustfmt、husky、基础 CI；提交 `chore: bootstrap project` |
 | 2026-08-22 | Phase 1 棋盘核心完成：Rust 规则引擎（52 测试，perft 对拍 44/1920/79666）、FEN、校验、旋转；React 棋盘 UI + 局面编辑器；提交 `feat: implement xiangqi board core` |
-| 2026-08-22 | Phase 2 棋谱树完成：真实树结构（Root/MoveNode/主线/变例/嵌套变例/Undo/Redo/InsertMove/DeleteVariation/Navigate/注释/NAG）、任意节点恢复局面、React Move Tree UI、Rust 76 + 前端 28 测试；提交 `feat: implement game tree` |
+| 2026-08-22 | Phase 2 棋谱树完成：真实树结构、任意节点恢复局面、React Move Tree UI；提交 `feat: implement game tree` |
+| 2026-08-22 | 架构审查修复：H1 注释/NAG 按节点定位、H2 文档/会话状态边界 + tree_json 序列化、H3 快照去 parse_fen、M1 position 派生、M2 变例提升/排序、M3 attacks_square；提交 `fix: address game tree architecture review` |

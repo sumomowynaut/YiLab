@@ -167,10 +167,11 @@ pub struct GameTree {
 | `make_move(node, mv)` | 若 `mv` 已是子节点则导航；否则校验合法后新建子节点 |
 | `add_variation(node, mv)` | 在 `node` 下追加一条新变例（合法校验） |
 | `delete_variation(node, child)` | 删除整棵子树 |
-| `promote_variation(node, child)` | 将 `child` 移到 `children[0]`（变主线） |
-| `reorder_variation(node, from, to)` | 交换变例顺序 |
-| `set_comment(node, text)` | 编辑注释 |
-| `truncate(node)` | 截断该节点之后的全部着法 |
+| `promote_variation(node)` | ✅ 已实现：把变例移到 `children[0]`（变主线） |
+| `reorder_variation(parent, from, to)` | ✅ 已实现：在变例区（index≥1）内移动子节点 |
+| `set_comment_at(node, text)` | ✅ 已实现：按节点 id 编辑注释（不依赖 current） |
+| `set_nag_at(node, nag, add)` | ✅ 已实现：按节点 id 添加/移除 NAG |
+| `truncate(node)` | 后续 Phase（随导入导出落地），当前未实现 |
 
 ### 7.4 序列化（tree_json）
 
@@ -190,6 +191,14 @@ pub struct GameTree {
 ```
 
 > 决策：棋谱树是「文档型」数据，用单 JSON 字段持久化，避免为变例/注释拆多张关系表（见 `architecture.md` §5）。
+
+**Document State 与 Session State（2026-08-22 明确）**
+
+- **Document State（棋谱文档数据）**：`startpos`、`root`、`nodes`（含着法/注释/NAG/子节点）、`headers` —— 持久化内容。
+- **Session State（会话/导航状态）**：`current`（当前浏览节点）、`redo_stack`（重做栈）—— **绝不进入持久化数据**。
+- 已实现 `game::serialize`（tree_json **版本 1**）：只序列化文档字段，导入时从起始局面回放着法重建派生数据
+  （`fen`/`parent`/`side_to_move`/`fullmove_number`）、校验结构完整、并把会话状态重置为根节点。
+- 未来若引入多文档/持久化，建议把 `current`/`redo_stack` 拆到 `GameSession { tree, current, redo_stack }`。
 
 ## 8. 规则边界与待确认
 

@@ -3,7 +3,7 @@ import type { BoardApi } from "../lib/board/api";
 import type { GameApi } from "../lib/game/api";
 import { parseFen, START_FEN } from "../lib/board/notation";
 import type { GameSnapshot } from "../lib/game/types";
-import { useGameStore } from "./useGameStore";
+import { selectDisplayPosition, useGameStore } from "./useGameStore";
 
 function makeSnapshot(overrides: Partial<GameSnapshot> = {}): GameSnapshot {
   return {
@@ -39,7 +39,7 @@ beforeEach(() => {
     api: null,
     boardApi: null,
     snapshot: null,
-    position: null,
+    editPosition: null,
     validation: null,
     selected: null,
     legalTargets: [],
@@ -61,8 +61,14 @@ beforeEach(() => {
     goToStart: vi.fn(async () => makeSnapshot()),
     goToEnd: vi.fn(async () => makeSnapshot()),
     deleteVariation: vi.fn(async () => makeSnapshot()),
-    setComment: vi.fn(async () => makeSnapshot({ comment: "注释" })),
-    setNag: vi.fn(async () => makeSnapshot({ nags: ["!"] })),
+    promoteVariation: vi.fn(async () => makeSnapshot()),
+    reorderVariation: vi.fn(async () => makeSnapshot()),
+    setComment: vi.fn(async (nodeId: number, comment: string) =>
+      makeSnapshot({ comment, currentId: nodeId }),
+    ),
+    setNag: vi.fn(async (nodeId: number, nag: string, add: boolean) =>
+      makeSnapshot({ nags: add ? [nag] : [], currentId: nodeId }),
+    ),
   };
   boardApi = {
     startPosition: vi.fn(async () => parseFen(START_FEN)),
@@ -98,7 +104,7 @@ describe("useGameStore", () => {
     await useGameStore.getState().init(gameApi, boardApi);
     const state = useGameStore.getState();
     expect(state.snapshot).not.toBeNull();
-    expect(state.position).toEqual(state.snapshot?.position);
+    expect(selectDisplayPosition(state)).toEqual(state.snapshot?.position);
   });
 
   it("navigates and updates the current position", async () => {
@@ -127,18 +133,34 @@ describe("useGameStore", () => {
     expect(gameApi.insertMove).toHaveBeenCalledWith("h2e2");
   });
 
-  it("deletes a variation", async () => {
+  it("deletes, promotes and reorders variations", async () => {
     await useGameStore.getState().init(gameApi, boardApi);
     await useGameStore.getState().deleteVariation(3);
     expect(gameApi.deleteVariation).toHaveBeenCalledWith(3);
+    await useGameStore.getState().promoteVariation(4);
+    expect(gameApi.promoteVariation).toHaveBeenCalledWith(4);
+    await useGameStore.getState().reorderVariation(0, 2, 1);
+    expect(gameApi.reorderVariation).toHaveBeenCalledWith(0, 2, 1);
+  });
+
+  it("sets comment and NAG with an explicit node id", async () => {
+    await useGameStore.getState().init(gameApi, boardApi);
+    await useGameStore.getState().setComment(7, "注释");
+    expect(gameApi.setComment).toHaveBeenCalledWith(7, "注释");
+    await useGameStore.getState().setNag(7, "!", true);
+    expect(gameApi.setNag).toHaveBeenCalledWith(7, "!", true);
   });
 
   it("rebases the tree when leaving edit mode", async () => {
     await useGameStore.getState().init(gameApi, boardApi);
     await useGameStore.getState().toggleEditing();
     expect(useGameStore.getState().editing).toBe(true);
+    expect(useGameStore.getState().editPosition).toEqual(
+      useGameStore.getState().snapshot?.position,
+    );
     await useGameStore.getState().toggleEditing();
     expect(gameApi.newGame).toHaveBeenCalled();
     expect(useGameStore.getState().editing).toBe(false);
+    expect(useGameStore.getState().editPosition).toBeNull();
   });
 });

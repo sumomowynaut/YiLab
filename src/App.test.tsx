@@ -8,7 +8,7 @@ beforeEach(() => {
     api: null,
     boardApi: null,
     snapshot: null,
-    position: null,
+    editPosition: null,
     validation: null,
     selected: null,
     legalTargets: [],

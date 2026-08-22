@@ -7,11 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./com
 import { getDefaultBoardApi } from "./lib/board/api";
 import { sideToColor } from "./lib/board/notation";
 import { getDefaultGameApi } from "./lib/game/api";
-import { useGameStore } from "./stores/useGameStore";
+import { selectDisplayPosition, useGameStore } from "./stores/useGameStore";
 
 function App() {
   const snapshot = useGameStore((state) => state.snapshot);
-  const position = useGameStore((state) => state.position);
+  const position = useGameStore(selectDisplayPosition);
   const validation = useGameStore((state) => state.validation);
   const selected = useGameStore((state) => state.selected);
   const legalTargets = useGameStore((state) => state.legalTargets);
@@ -37,6 +37,8 @@ function App() {
   const goToStart = useGameStore((state) => state.goToStart);
   const goToEnd = useGameStore((state) => state.goToEnd);
   const deleteVariation = useGameStore((state) => state.deleteVariation);
+  const promoteVariation = useGameStore((state) => state.promoteVariation);
+  const reorderVariation = useGameStore((state) => state.reorderVariation);
   const setComment = useGameStore((state) => state.setComment);
   const setNag = useGameStore((state) => state.setNag);
   const toggleVariation = useGameStore((state) => state.toggleVariation);
@@ -182,6 +184,8 @@ function App() {
               onNavigate={(id) => void navigate(id)}
               onToggleVariation={toggleVariation}
               onDeleteVariation={(id) => void deleteVariation(id)}
+              onPromoteVariation={(id) => void promoteVariation(id)}
+              onReorderVariation={(parentId, from, to) => void reorderVariation(parentId, from, to)}
             />
 
             <div className="flex flex-col gap-1">
@@ -192,7 +196,7 @@ function App() {
                 id="comment"
                 value={commentDraft}
                 onChange={(event) => setCommentDraft(event.currentTarget.value)}
-                onBlur={() => void setComment(commentDraft)}
+                onBlur={() => void setComment(snapshot.currentId, commentDraft)}
                 rows={2}
                 placeholder="为当前棋步添加注释…"
                 className="rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -205,7 +209,7 @@ function App() {
                       key={nag}
                       variant={active ? "default" : "outline"}
                       size="sm"
-                      onClick={() => void setNag(nag, !active)}
+                      onClick={() => void setNag(snapshot.currentId, nag, !active)}
                     >
                       {nag}
                     </Button>
