@@ -1,0 +1,51 @@
+# 功能矩阵（Feature Matrix）
+
+> 本表把所有目标功能拆成可验收条目。每项包含：Feature、Description、Priority、Phase、Status、Test、Dependencies、Notes。
+
+## 图例
+
+- **Priority**：P0 必须 / P1 重要 / P2 增强。
+- **Phase**：0~6（见 `development-plan.md` §2）。
+- **Status**：`Not Started` / `In Progress` / `Done` / `Blocked` / `Needs Verification`。当前（规划阶段）全部为 `Not Started`。
+
+## 矩阵
+
+| # | Feature | Description | Priority | Phase | Status | Test | Dependencies | Notes |
+|---|---------|-------------|----------|-------|--------|------|--------------|-------|
+| 1 | 完整中国象棋棋盘 | 渲染 9×10 棋盘与 32 枚棋子，支持选中、走法高亮、翻转(180°)与左右镜像 | P0 | 1 | Not Started | 棋盘组件渲染 + 快照测试 | Phase 0 UI 脚手架 | SVG 渲染，红黑视角可切换 |
+| 2 | 合法走棋 | 走法生成 + 合法性校验（马腿/相眼/炮架/过河兵/将帅照面/应将） | P0 | 1 | Not Started | perft 对拍 + 规则单元测试 | 棋盘数据模型 | Rust 原生实现，不依赖引擎 |
+| 3 | FEN | 解析与序列化中国象棋 FEN | P0 | 1 | Not Started | 往返一致 + 黄金样例 | 棋盘数据模型 | 起始局面见 `game-model.md` |
+| 4 | 局面编辑 | 摆棋/清空/切换先手方并生成 FEN | P1 | 2 | Not Started | 编辑器组件 + 命令测试 | FEN、棋盘模型 | 编辑即清空棋谱（对齐网页版） |
+| 5 | Game Tree | 棋谱树数据模型与持久化 | P0 | 2 | Not Started | 树操作单元测试 | 棋谱数据模型 | 文档型 JSON 持久化 |
+| 6 | 主线 | 沿第一子节点走主线，主线导航 | P0 | 2 | Not Started | 主线导航单测 + E2E | Game Tree | children[0] 为主线 |
+| 7 | 多变例 | 增/删/提/换序变例，切换显示 | P0 | 2 | Not Started | 变例操作单测 + E2E | Game Tree | 变例着法标记「变」 |
+| 8 | 棋谱注释 | 节点注释与 NAG（?! 等）编辑 | P1 | 2 | Not Started | 注释编辑测试 | Game Tree | 有注释着法标记「*」 |
+| 9 | 本地 Pikafish | 定位/捆绑本地引擎二进制并启动 | P0 | 3 | Not Started | 引擎 spawn/握手集成测试 | Engine Manager、许可决策 | 工作目录解析 NNUE |
+| 10 | UCI | UCI 协议实现（命令编解码 + info 解析） | P0 | 3 | Not Started | UCI 解析 Fixture 测试 | Engine Manager | UCI-Cyclone 坐标 |
+| 11 | MultiPV | 多主变分析展示 | P1 | 3 | Not Started | MultiPV 集成测试 | UCI、引擎参数 | 默认关闭，上限运行时读取 |
+| 12 | 引擎参数 | Threads/Hash/MultiPV 等选项读写与持久化 | P1 | 3 | Not Started | setoption 往返测试 | UCI | 高级选项透传 |
+| 13 | 棋谱导入导出 | 通用导入导出框架 + 文件/粘贴/复制入口 | P0 | 2 | Not Started | 框架 + 往返测试 | 各格式适配器 | FEN/PGN/TXT 先行 |
+| 14 | XQF | XQF 二进制导入导出 | P1 | 4 | Not Started | 往返 + 样本库 | 格式调研（NEEDS_VERIFICATION） | 先导出后导入 |
+| 15 | PGN | 中国象棋 PGN 导入导出（变例/注释） | P0 | 2 | Not Started | 往返语义等价 | 导入导出框架 | 方言待定 |
+| 16 | TXT | 中文纵线制文本棋谱导入导出 | P1 | 2 | Not Started | 往返 + 换算边界 | 导入导出框架 | 线性为主 |
+| 17 | 东萍棋谱 | 东萍格式导入导出（支持变例） | P1 | 4 | Not Started | 往返 + 样本库 | 格式调研（NEEDS_VERIFICATION） | 语法待确认 |
+| 18 | 截图识别 | 棋盘图片识别局面（可人工校正） | P2 | 5 | Not Started | OCR 结构 + 校正 E2E | OCR 管线 | 可降级 |
+| 19 | 本地开局库 | 离线开局库导入与查询 | P1 | 4 | Not Started | 查询排序单测 | Book Provider、格式调研 | 完全离线 |
+| 20 | 云库 | 皮卡鱼云库查询（W/D/L，可降级） | P2 | 4 | Not Started | 云库 mock + 回退测试 | 云库 API（NEEDS_VERIFICATION） | 失败回退本地 |
+| 21 | 自动走库 | 命中走库 + 脱库步数控制 | P2 | 4 | Not Started | 走库链路单测 | 本地/云库 | 脱库步数语义对齐网页版 |
+| 22 | 评价曲线 | 主变分数随回合曲线图 | P1 | 3 | Not Started | 分数序列计算 + 图表渲染 | 引擎 info、analysis 表 | 评分可持久化 |
+| 23 | 自动复盘 | 整局批量分析 + 逐着点评 + 落库 | P1 | 5 | Not Started | 批量分析流程 E2E | 引擎、评价曲线、DB | 异步执行 |
+| 24 | GIF | 导出棋局动态图 | P2 | 5 | Not Started | GIF 产出可播放测试 | UI 渲染、导出 | 独立渲染管线 |
+| 25 | 深色模式 | 深色主题 | P1 | 1 | Not Started | 主题切换测试 | Tailwind/shadcn 主题令牌 | 与浅色共主题体系 |
+| 26 | 浅色模式 | 浅色主题 | P1 | 1 | Not Started | 主题切换测试 | 主题令牌 | 默认浅色 |
+| 27 | 快捷键 | 全局键盘快捷键（导航/分析/翻转等） | P2 | 5 | Not Started | 快捷键映射单测 | UI 状态、命令层 | 提供可配置清单 |
+| 28 | Windows Installer | NSIS/MSI 安装版 | P0 | 6 | Not Started | 安装包冒烟测试 | 打包、许可决策 | 含 WebView2 引导 |
+| 29 | Portable | 便携版 | P1 | 6 | Not Started | 解压即用冒烟 | 打包方案（NEEDS_VERIFICATION） | 便携方案待定 |
+| 30 | GitHub Actions | CI 与 Release 自动化 | P1 | 0 | In Progress | CI 全绿 + Release 触发 | 工程骨架 | Phase 0 CI 骨架已完成；Release 流水线待 Phase 6 |
+| 31 | GitHub Release | 发布产物到 GitHub Release | P1 | 6 | Not Started | Release 产物校验 | CI/CD、打包 | 依赖许可决策 |
+
+## 说明
+
+- `Phase 0` 的 #30（GitHub Actions）在后续 Phase 中持续演进，最终于 Phase 6 交付完整 Release 流水线。
+- #9/#28/#29/#31 与许可决策耦合：开发可先行，**公开分发在许可确认前标记为 Blocked**（见 `licensing.md`）。
+- 每项 `Test` 对应 `testing.md` 中的可执行测试；功能「Done」= 该 Test 通过 + `Status` 更新为 `Done`。
