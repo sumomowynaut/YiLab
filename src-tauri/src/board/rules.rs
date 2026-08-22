@@ -437,6 +437,15 @@ pub fn legal_moves(pos: &Position) -> Vec<Move> {
         .collect()
 }
 
+/// 依序执行一串着法（PV 预览用）；任一步非法即返回错误。
+pub fn apply_moves(pos: &Position, moves: &[Move]) -> Result<Position, String> {
+    let mut cur = pos.clone();
+    for mv in moves {
+        cur = apply_move(&cur, *mv).ok_or_else(|| format!("非法着法：{}", mv.uci()))?;
+    }
+    Ok(cur)
+}
+
 /// 走棋：仅当合法时返回新局面。
 pub fn apply_move(pos: &Position, mv: Move) -> Option<Position> {
     if legal_moves(pos).contains(&mv) {

@@ -285,3 +285,31 @@ async fn stop_returns_on_hung_engine_timeout() {
     );
     mgr.quit().await.expect("quit");
 }
+
+#[tokio::test]
+async fn search_start_emits_searching_event() {
+    let mgr = EngineManager::spawn(mock_config("")).await.expect("spawn");
+    let mut rx = mgr.subscribe();
+    mgr.go(GoParams {
+        movetime_ms: Some(60),
+        ..Default::default()
+    })
+    .await
+    .expect("go");
+    let searching = wait_for(
+        &mut rx,
+        |ev| matches!(ev, EngineEvent::Searching).then_some(()),
+        Duration::from_secs(3),
+    )
+    .await
+    .is_some();
+    assert!(searching, "搜索开始应发出 Searching 事件");
+    // 让搜索自然结束，避免遗留搜索中的进程
+    let _ = wait_for(
+        &mut rx,
+        |ev| matches!(ev, EngineEvent::BestMove(_)).then_some(()),
+        Duration::from_secs(3),
+    )
+    .await;
+    mgr.quit().await.expect("quit");
+}

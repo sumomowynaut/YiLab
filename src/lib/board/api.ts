@@ -15,6 +15,8 @@ export interface BoardApi {
   fromFen(fen: string): Promise<PositionWithValidation>;
   legalMoves(fen: string): Promise<string[]>;
   makeMove(fen: string, mv: string): Promise<PositionSnapshot>;
+  /** 依序应用一串着法（PV 预览用）。 */
+  applyMoves(fen: string, moves: string[]): Promise<PositionSnapshot>;
   validate(fen: string): Promise<ValidationResult>;
   rotate(fen: string, mode: "180" | "mirror"): Promise<PositionSnapshot>;
   setPiece(
@@ -37,6 +39,7 @@ export const tauriBoardApi: BoardApi = {
   },
   legalMoves: (fen) => invokeCommand<string[]>("board_legal_moves", { fen }),
   makeMove: (fen, mv) => invokeCommand<PositionSnapshot>("board_make_move", { fen, mv }),
+  applyMoves: (fen, moves) => invokeCommand<PositionSnapshot>("board_apply_moves", { fen, moves }),
   validate: (fen) => invokeCommand<ValidationResult>("board_validate", { fen }),
   rotate: (fen, mode) => invokeCommand<PositionSnapshot>("board_rotate", { fen, mode }),
   setPiece: async (fen, square, color, kind) => {
@@ -84,6 +87,9 @@ export const memoryBoardApi: BoardApi = {
   legalMoves: async () => [],
   makeMove: async () => {
     throw new Error("走子需要 Tauri 环境（Rust 规则核心）");
+  },
+  applyMoves: async () => {
+    throw new Error("PV 预览需要 Tauri 环境（Rust 规则核心）");
   },
   validate: async () => ({ ok: true, issues: [] }),
   rotate: async (fen) => parseFen(fen),

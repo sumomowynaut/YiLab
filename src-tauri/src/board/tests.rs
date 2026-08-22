@@ -2,7 +2,7 @@
 
 use super::fen::{parse_fen, to_fen};
 use super::rules::{
-    apply_move, attacks_square, is_checkmate, is_in_check, is_stalemate, legal_moves,
+    apply_move, apply_moves, attacks_square, is_checkmate, is_in_check, is_stalemate, legal_moves,
     make_unchecked, perft, piece_targets,
 };
 use super::transform::{mirrored, rotated_180};
@@ -575,4 +575,26 @@ fn attacks_square_matches_piece_targets() {
             }
         }
     }
+}
+
+// ---------- apply_moves（PV 预览） ----------
+
+#[test]
+fn apply_moves_applies_sequence() {
+    let p = pos(START_FEN);
+    let seq = ["h2e2", "h7e7", "h0g2", "b9c7"];
+    let moves: Vec<Move> = seq.iter().map(|s| Move::parse_uci(s).unwrap()).collect();
+    let end = apply_moves(&p, &moves).expect("apply");
+    let mut cur = p.clone();
+    for s in seq {
+        cur = make_unchecked(&cur, Move::parse_uci(s).unwrap());
+    }
+    assert_eq!(to_fen(&end), to_fen(&cur));
+}
+
+#[test]
+fn apply_moves_rejects_illegal_step() {
+    let p = pos(START_FEN);
+    let moves = vec![Move::parse_uci("e2e5").unwrap()]; // e2 无子
+    assert!(apply_moves(&p, &moves).is_err());
 }

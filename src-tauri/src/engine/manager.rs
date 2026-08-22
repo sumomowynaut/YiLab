@@ -410,7 +410,7 @@ async fn run_process(
                         } else if stopping {
                             pending = Some(Pending::PositionAndGo { fen: None, moves: Vec::new(), params });
                         } else {
-                            start_go(&mut stdin, &params, &mut searching, &mut go_guard, &mut wait_token, cmd_tx.clone()).await;
+                            start_go(&mut stdin, &params, &mut searching, &mut go_guard, &mut wait_token, cmd_tx.clone(), &events).await;
                             set_status!(EngineStatus::Searching);
                         }
                     }
@@ -427,7 +427,7 @@ async fn run_process(
                             pending = Some(Pending::PositionAndGo { fen, moves, params });
                         } else {
                             write_line(&mut stdin, &uci::position(fen.as_deref(), &moves)).await;
-                            start_go(&mut stdin, &params, &mut searching, &mut go_guard, &mut wait_token, cmd_tx.clone()).await;
+                            start_go(&mut stdin, &params, &mut searching, &mut go_guard, &mut wait_token, cmd_tx.clone(), &events).await;
                             set_status!(EngineStatus::Searching);
                         }
                     }
@@ -559,9 +559,11 @@ async fn start_go(
     go_guard: &mut Option<u64>,
     wait_token: &mut u64,
     cmd_tx: mpsc::Sender<Cmd>,
+    events: &broadcast::Sender<EngineEvent>,
 ) {
     write_line(stdin, &uci::go(params)).await;
     *searching = true;
+    let _ = events.send(EngineEvent::Searching);
     if let Some(ms) = params.movetime_ms {
         let token = next_token(wait_token);
         *go_guard = Some(token);
@@ -591,7 +593,10 @@ async fn finish_stop(
         }
         Some(Pending::PositionAndGo { fen, moves, params }) => {
             write_line(stdin, &uci::position(fen.as_deref(), &moves)).await;
-            start_go(stdin, &params, searching, go_guard, wait_token, cmd_tx).await;
+            start_go(
+                stdin, &params, searching, go_guard, wait_token, cmd_tx, events,
+            )
+            .await;
             *status.lock().unwrap_or_else(|e| e.into_inner()) = EngineStatus::Searching;
         }
         None => {

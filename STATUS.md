@@ -5,7 +5,7 @@
 
 ## 当前阶段
 
-**Phase 3（Pikafish Engine）✅ 引擎层完成（UI 待后续）**
+**Phase 3（Pikafish Engine）✅ 引擎层 + 分析 UI 完成**
 
 - ✅ `src-tauri/src/engine/`：Engine interface（`EngineManager`）、Engine Process（tokio 异步）、UCI parser / command builder。
 - ✅ 支持：`uci` / `isready` / `setoption` / `position` / `go` / `stop` / `quit`。
@@ -14,7 +14,8 @@
 - ✅ 生命周期处理：启动失败（握手超时/提前退出）、崩溃（stdout EOF → Crashed 事件）、停止/等待超时（token 定时器）、restart、quit、**分析期间切换局面**（先 stop 等 bestmove 再 position+go）。
 - ✅ Mock 引擎（`mock_engine` bin，可通过 `MOCK_BEHAVIOR` 注入 no_uciok/no_readyok/crash_on_go/hang_on_go）驱动 9 个集成测试。
 - ✅ 真实 Pikafish 冒烟测试（`tests/pikafish_smoke.rs`，默认 `#[ignore]`）：官方 Pikafish-2026-01-02 本地运行通过（握手、Threads/Hash/MultiPV、分析出 info+bestmove）。
-- ⛔ 引擎 UI / 引擎参数面板 / MultiPV 展示 / 评价曲线 / 自动复盘：后续 Phase 3 子任务（feature-matrix #9/#10/#11/#12/#22）。
+- ✅ 引擎分析 UI：Analysis Panel（评价/深度/节点/NPS/时间/MultiPV/PV）、引擎参数（Threads/Hash/Depth/MultiPV 1/2/3/5/10）、开始/停止/重启、**点击 PV 在棋盘预览**、**快速切换局面防旧分析覆盖（epoch + Searching 边界事件）**。
+- ⛔ 评价曲线 / 自动复盘 / 人机对弈循环：后续 Phase 3 子任务。
 
 **Phase 2（Game Tree 棋谱树）✅ 核心完成 + 架构审查修复完成**
 
@@ -47,11 +48,11 @@
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 64 lib + 9 engine_manager + 30 game_tree（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
+| `cargo test` | ✅ | 66 lib + 10 engine_manager + 30 game_tree（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
-| `npm run test` | ✅ | 30 个前端用例 |
+| `npm run test` | ✅ | 43 个前端用例 |
 | `npm run lint` | ✅ | 0 error 0 warning |
 | `npm run format:check` | ✅ | |
 | `npm run build` | ✅ | tsc + vite build |
@@ -104,3 +105,4 @@
 | 2026-08-22 | Phase 2 棋谱树完成：真实树结构、任意节点恢复局面、React Move Tree UI；提交 `feat: implement game tree` |
 | 2026-08-22 | 架构审查修复：H1 注释/NAG 按节点定位、H2 文档/会话状态边界 + tree_json 序列化、H3 快照去 parse_fen、M1 position 派生、M2 变例提升/排序、M3 attacks_square；提交 `fix: address game tree architecture review` |
 | 2026-08-22 | Pikafish 引擎层完成：Engine Manager/UCI 编解码/Mock 引擎/崩溃重启/超时/分析切换局面；真实 Pikafish 冒烟通过；提交 `feat: integrate pikafish engine` |
+| 2026-08-22 | 引擎分析 UI：Analysis Panel（评价/深度/NPS/PV/MultiPV）、参数面板、开始/停止/重启、PV 棋盘预览、切换局面防竞态；提交 `feat: add engine analysis interface` |

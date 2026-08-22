@@ -116,6 +116,18 @@ pub fn board_fen(fen: String) -> Result<String, String> {
     Ok(to_fen(&pos))
 }
 
+/// 依序应用一串着法（PV 预览用），返回最终局面。
+#[tauri::command]
+pub fn board_apply_moves(fen: String, moves: Vec<String>) -> Result<PositionDto, String> {
+    let pos = parse_fen(&fen)?;
+    let parsed: Vec<Move> = moves
+        .iter()
+        .map(|m| Move::parse_uci(m).ok_or_else(|| format!("非法着法格式：{m}")))
+        .collect::<Result<_, _>>()?;
+    let end = crate::board::rules::apply_moves(&pos, &parsed)?;
+    Ok(PositionDto::from_position(&end))
+}
+
 // ===================== 棋谱树（Game Tree）命令 =====================
 
 fn game_err<E: std::fmt::Display>(e: E) -> String {
@@ -256,4 +268,147 @@ pub fn game_reorder_variation(
     tree.reorder_variation(parent_id, from, to)
         .map_err(game_err)?;
     game_snapshot_dto(&tree).map_err(game_err)
+}
+
+// ===================== 引擎分析（Engine Analysis）命令 =====================
+
+use crate::engine::manager::EngineManager;
+use crate::engine::types::{EngineConfig, EngineStatus, GoParams};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+use tauri::{AppHandle, Emitter};
+
+struct EngineInstance {
+    mgr: Arc<EngineManager>,
+    forwarder: tokio::task::JoinHandle<()>,
+}
+
+fn engine_instance() -> &'static Mutex<Option<EngineInstance>> {
+    static INSTANCE: OnceLock<Mutex<Option<EngineInstance>>> = OnceLock::new();
+    INSTANCE.get_or_init(|| Mutex::new(None))
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EngineStatusDto {
+    pub status: &'static str,
+    pub engine_id: Option<String>,
+}
+
+fn status_name(s: EngineStatus) -> &'static str {
+    match s {
+        EngineStatus::Stopped => "stopped",
+        EngineStatus::Ready => "ready",
+        EngineStatus::Searching => "searching",
+        EngineStatus::Crashed => "crashed",
+    }
+}
+
+/// 启动引擎；`program` 为空时回退到 `PIKAFISH_BIN` 环境变量。
+#[tauri::command]
+pub async fn engine_start(program: Option<String>, app: AppHandle) -> Result<String, String> {
+    let program = match program {
+        Some(p) if !p.trim().is_empty() => p,
+        _ => std::env::var("PIKAFISH_BIN")
+            .map_err(|_| "未指定引擎程序路径（请传入 program 或设置 PIKAFISH_BIN）".to_string())?,
+    };
+    // 回收旧实例（先取走，避免持锁跨 await）
+    let old = {
+        let mut guard = engine_instance().lock().map_err(|e| e.to_string())?;
+        guard.take()
+    };
+    if let Some(old) = old {
+        let _ = old.mgr.quit().await;
+        old.forwarder.abort();
+    }
+
+    let config = EngineConfig {
+        program: PathBuf::from(program),
+        args: Vec::new(),
+        env: HashMap::new(),
+        cwd: None,
+        handshake_timeout: Duration::from_secs(10),
+    };
+    let mgr = Arc::new(EngineManager::spawn(config).await?);
+    let mut rx = mgr.subscribe();
+    let app2 = app.clone();
+    let forwarder = tokio::spawn(async move {
+        while let Ok(ev) = rx.recv().await {
+            let _ = app2.emit("engine://event", ev);
+        }
+    });
+    let engine_id = mgr.engine_id().unwrap_or_default();
+    let mut guard = engine_instance().lock().map_err(|e| e.to_string())?;
+    *guard = Some(EngineInstance { mgr, forwarder });
+    Ok(engine_id)
+}
+
+#[tauri::command]
+pub async fn engine_status() -> Result<EngineStatusDto, String> {
+    let guard = engine_instance().lock().map_err(|e| e.to_string())?;
+    let Some(inst) = guard.as_ref() else {
+        return Ok(EngineStatusDto {
+            status: "stopped",
+            engine_id: None,
+        });
+    };
+    Ok(EngineStatusDto {
+        status: status_name(inst.mgr.status()),
+        engine_id: inst.mgr.engine_id(),
+    })
+}
+
+#[tauri::command]
+pub async fn engine_set_option(name: String, value: Option<String>) -> Result<(), String> {
+    let mgr = {
+        let guard = engine_instance().lock().map_err(|e| e.to_string())?;
+        guard.as_ref().ok_or("引擎未启动")?.mgr.clone()
+    };
+    mgr.set_option(&name, value.as_deref()).await
+}
+
+#[tauri::command]
+pub async fn engine_set_position_and_go(
+    fen: String,
+    moves: Vec<String>,
+    params: GoParams,
+) -> Result<(), String> {
+    let mgr = {
+        let guard = engine_instance().lock().map_err(|e| e.to_string())?;
+        guard.as_ref().ok_or("引擎未启动")?.mgr.clone()
+    };
+    mgr.set_position_and_go(Some(&fen), &moves, params).await
+}
+
+#[tauri::command]
+pub async fn engine_stop() -> Result<(), String> {
+    let mgr = {
+        let guard = engine_instance().lock().map_err(|e| e.to_string())?;
+        guard.as_ref().ok_or("引擎未启动")?.mgr.clone()
+    };
+    mgr.stop().await
+}
+
+#[tauri::command]
+pub async fn engine_restart() -> Result<(), String> {
+    let mgr = {
+        let guard = engine_instance().lock().map_err(|e| e.to_string())?;
+        guard.as_ref().ok_or("引擎未启动")?.mgr.clone()
+    };
+    mgr.restart().await
+}
+
+#[tauri::command]
+pub async fn engine_quit() -> Result<(), String> {
+    let old = {
+        let mut guard = engine_instance().lock().map_err(|e| e.to_string())?;
+        guard.take()
+    };
+    if let Some(old) = old {
+        let _ = old.mgr.quit().await;
+        old.forwarder.abort();
+    }
+    Ok(())
 }

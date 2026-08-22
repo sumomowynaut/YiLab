@@ -4,9 +4,12 @@ import { MoveTree } from "./components/board/MoveTree";
 import { PiecePalette } from "./components/board/PiecePalette";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
+import { AnalysisPanel } from "./components/engine/AnalysisPanel";
 import { getDefaultBoardApi } from "./lib/board/api";
 import { sideToColor } from "./lib/board/notation";
+import { getDefaultEngineApi } from "./lib/engine/api";
 import { getDefaultGameApi } from "./lib/game/api";
+import { useEngineStore } from "./stores/useEngineStore";
 import { selectDisplayPosition, useGameStore } from "./stores/useGameStore";
 
 function App() {
@@ -42,12 +45,41 @@ function App() {
   const setComment = useGameStore((state) => state.setComment);
   const setNag = useGameStore((state) => state.setNag);
   const toggleVariation = useGameStore((state) => state.toggleVariation);
+  const engineStatus = useEngineStore((state) => state.status);
+  const engineId = useEngineStore((state) => state.engineId);
+  const engineLines = useEngineStore((state) => state.lines);
+  const engineBestMove = useEngineStore((state) => state.bestMove);
+  const engineSettings = useEngineStore((state) => state.settings);
+  const engineMessage = useEngineStore((state) => state.message);
+  const analysisEnabled = useEngineStore((state) => state.analysisEnabled);
+  const preview = useEngineStore((state) => state.preview);
+  const engineInit = useEngineStore((state) => state.init);
+  const engineStart = useEngineStore((state) => state.start);
+  const engineStop = useEngineStore((state) => state.stop);
+  const engineRestart = useEngineStore((state) => state.restart);
+  const engineApplySettings = useEngineStore((state) => state.applySettings);
+  const engineStartAnalysis = useEngineStore((state) => state.startAnalysis);
+  const enginePreviewPv = useEngineStore((state) => state.previewPv);
+  const engineClearPreview = useEngineStore((state) => state.clearPreview);
   const [fenInput, setFenInput] = useState("");
   const [commentDraft, setCommentDraft] = useState("");
 
   useEffect(() => {
     void init(getDefaultGameApi(), getDefaultBoardApi());
   }, [init]);
+
+  // 引擎初始化（订阅事件）
+  useEffect(() => {
+    engineInit(getDefaultEngineApi(), getDefaultBoardApi());
+  }, [engineInit]);
+
+  // 分析开启时：切换棋步 → 对新局面发起分析（引擎内部 stop→position→go）
+  const currentFen = snapshot?.currentFen ?? null;
+  useEffect(() => {
+    if (analysisEnabled && currentFen) {
+      void engineStartAnalysis(currentFen);
+    }
+  }, [currentFen, analysisEnabled, engineStartAnalysis]);
 
   // 同步注释草稿
   useEffect(() => {
@@ -98,16 +130,34 @@ function App() {
       <Card className="w-full max-w-5xl">
         <CardHeader>
           <CardTitle>PikaXiangqi</CardTitle>
-          <CardDescription>中国象棋复盘与分析 — 棋谱树（Phase 2）</CardDescription>
+          <CardDescription>中国象棋复盘与分析 — 棋谱树 + 引擎分析（Phase 3）</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-6">
-          <Board
-            position={position}
-            selected={selected}
-            legalTargets={legalTargets}
-            view={view}
-            onSquareClick={(sq) => void handleSquareClick(sq)}
-          />
+          <div className="flex flex-col gap-2">
+            {preview && (
+              <div className="flex items-center gap-2 rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs text-blue-700">
+                <span>
+                  预览变化：<span className="font-mono">{preview.moves.join(" ")}</span>
+                </span>
+                <Button variant="outline" size="sm" onClick={engineClearPreview}>
+                  退出预览
+                </Button>
+              </div>
+            )}
+            <Board
+              position={preview?.position ?? position}
+              selected={selected}
+              legalTargets={legalTargets}
+              view={view}
+              onSquareClick={(sq) => {
+                if (preview) {
+                  engineClearPreview();
+                  return;
+                }
+                void handleSquareClick(sq);
+              }}
+            />
+          </div>
 
           <div className="flex min-w-72 flex-1 flex-col gap-3">
             <div className="flex items-center gap-2 text-sm">
@@ -186,6 +236,24 @@ function App() {
               onDeleteVariation={(id) => void deleteVariation(id)}
               onPromoteVariation={(id) => void promoteVariation(id)}
               onReorderVariation={(parentId, from, to) => void reorderVariation(parentId, from, to)}
+            />
+
+            <AnalysisPanel
+              status={engineStatus}
+              engineId={engineId}
+              lines={engineLines}
+              bestMove={engineBestMove}
+              settings={engineSettings}
+              message={engineMessage}
+              onStart={() => void engineStart()}
+              onStop={() => void engineStop()}
+              onRestart={() => void engineRestart()}
+              onApplySettings={(patch) => void engineApplySettings(patch)}
+              onPreview={(pv) => {
+                if (snapshot) {
+                  void enginePreviewPv(pv, snapshot.currentFen);
+                }
+              }}
             />
 
             <div className="flex flex-col gap-1">

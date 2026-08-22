@@ -10,3 +10,8 @@ export async function invokeCommand<T>(cmd: string, args?: Record<string, unknow
   const { invoke } = await import("@tauri-apps/api/core");
   return invoke<T>(cmd, args);
 }
+/** 订阅一个 Tauri 事件，返回取消函数。 */
+export async function listenEvent<T>(event: string, cb: (payload: T) => void): Promise<() => void> {
+  const { listen } = await import("@tauri-apps/api/event");
+  return listen<T>(event, (e) => cb(e.payload));
+}

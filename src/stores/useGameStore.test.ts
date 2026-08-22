@@ -78,6 +78,7 @@ beforeEach(() => {
     })),
     legalMoves: vi.fn(async () => ["h2e2"]),
     makeMove: vi.fn(async () => parseFen(START_FEN)),
+    applyMoves: vi.fn(async () => parseFen(START_FEN)),
     validate: vi.fn(async () => ({ ok: true, issues: [] })),
     rotate: vi.fn(async () => parseFen(START_FEN)),
     setPiece: vi.fn(async () => ({

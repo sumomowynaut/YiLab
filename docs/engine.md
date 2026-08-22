@@ -155,3 +155,6 @@ analysis_stop():
 - Mock 引擎 `mock_engine`（`[[bin]]`）用于集成测试；真实 Pikafish 冒烟测试 `tests/pikafish_smoke.rs`（默认 ignore，需 `PIKAFISH_BIN`/`PIKAFISH_CWD`）。
 - 引擎工作目录通过 `EngineConfig.cwd` 指定，使引擎默认读到同目录 `pikafish.nnue`。
 - 分发（安装包捆绑引擎/权重）受许可证决策约束，当前不实现；详见 `STATUS.md` 与 `licensing.md`。
+- 引擎分析命令层（`engine_start/status/set_option/set_position_and_go/stop/restart/quit`）与事件转发（`engine://event`，`EngineEvent` camelCase 序列化）。
+- `Searching` 事件作为「新分析」的边界：前端在切换局面后清空旧显示并进入 pending，收到 `Searching` 才开始接受事件，防止旧分析覆盖新局面。
+- React Analysis Panel（评价/深度/节点/NPS/时间/MultiPV/PV + 参数 + 开始/停止/重启 + PV 预览），详见 `src/components/engine/AnalysisPanel.tsx` 与 `src/stores/useEngineStore.ts`。

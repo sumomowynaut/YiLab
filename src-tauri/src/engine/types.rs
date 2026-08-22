@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// 分值：`cp` 厘兵（红方视角）或 `mate`（多少步内杀）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum Score {
     Cp(i32),
     Mate(i32),
@@ -15,6 +16,7 @@ pub enum Score {
 
 /// 一行 `info ...` 的解析结果。
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct InfoLine {
     pub depth: Option<u32>,
     pub seldepth: Option<u32>,
@@ -37,16 +39,24 @@ pub struct BestMove {
 
 /// 引擎主动推送的事件。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum EngineEvent {
     Info(InfoLine),
     InfoString(String),
     BestMove(BestMove),
+    /// 新一次搜索开始（前端用它作为「新分析」的事件边界，处理快速切换局面的竞态）。
+    Searching,
     Ready,
     Started,
     Stopped,
-    OptionSet { name: String, value: Option<String> },
+    OptionSet {
+        name: String,
+        value: Option<String>,
+    },
     Error(String),
-    Crashed { code: Option<i32> },
+    Crashed {
+        code: Option<i32>,
+    },
 }
 
 /// 引擎生命周期状态。
@@ -60,6 +70,7 @@ pub enum EngineStatus {
 
 /// `go` 参数。
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GoParams {
     pub infinite: bool,
     pub depth: Option<u32>,
