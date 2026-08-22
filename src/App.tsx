@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useShortcuts } from "./hooks/useShortcuts";
 import { Board } from "./components/board/Board";
 import { MoveTree } from "./components/board/MoveTree";
 import { PiecePalette } from "./components/board/PiecePalette";
@@ -99,34 +100,48 @@ function App() {
     setCommentDraft(snapshot?.comment ?? "");
   }, [snapshot?.comment]);
 
-  // 键盘导航：←/→ 上一步/下一步，Ctrl+Z / Ctrl+Y 悔棋/重做
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const el = document.activeElement;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
-        return;
-      }
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        void previous();
-      } else if (event.key === "ArrowRight") {
-        event.preventDefault();
-        void next();
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
-        event.preventDefault();
-        if (event.shiftKey) {
-          void redo();
-        } else {
+  // 全局快捷键：←/→ 导航、Home/End 首尾、F/M 翻转/镜像、Space 分析启停、Ctrl+Z/Y 悔棋/重做
+  useShortcuts({
+    onAction: (action) => {
+      switch (action) {
+        case "previous":
+          void previous();
+          break;
+        case "next":
+          void next();
+          break;
+        case "goToStart":
+          void goToStart();
+          break;
+        case "goToEnd":
+          void goToEnd();
+          break;
+        case "undo":
           void undo();
-        }
-      } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
-        event.preventDefault();
-        void redo();
+          break;
+        case "redo":
+          void redo();
+          break;
+        case "flip":
+          rotateView();
+          break;
+        case "mirror":
+          mirrorView();
+          break;
+        case "toggleAnalysis":
+          if (analysisEnabled) {
+            void engineStop();
+          } else {
+            void engineStart();
+          }
+          break;
       }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [previous, next, undo, redo]);
+    },
+    shouldIgnore: () => {
+      const el = document.activeElement;
+      return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+    },
+  });
 
   if (!snapshot || !position) {
     return (

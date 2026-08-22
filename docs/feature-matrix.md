@@ -38,7 +38,7 @@
 | 24 | GIF | 导出棋局动态图 | P2 | 5 | Not Started | GIF 产出可播放测试 | UI 渲染、导出 | 独立渲染管线 |
 | 25 | 深色模式 | 深色主题 | P1 | 1 | Done | 主题 store 测试（4 用例）+ App 切换测试 | Tailwind/shadcn 主题令牌 | 与浅色共主题体系；localStorage 持久化 + 跟随系统偏好 |
 | 26 | 浅色模式 | 浅色主题 | P1 | 1 | Done | 主题 store 测试（4 用例）+ App 切换测试 | 主题令牌 | 默认浅色（`:root`），随主题切换 |
-| 27 | 快捷键 | 全局键盘快捷键（导航/分析/翻转等） | P2 | 5 | Not Started | 快捷键映射单测 | UI 状态、命令层 | 提供可配置清单 |
+| 27 | 快捷键 | 全局键盘快捷键（导航/分析/翻转等） | P2 | 5 | Done | 快捷键映射单测（7）+ hook 测试（3） | UI 状态、命令层 | 可配置清单 `src/lib/shortcuts.ts`（←/→、Home/End、F/M、Space、Ctrl+Z/Y） |
 | 28 | Windows Installer | NSIS/MSI 安装版 | P0 | 6 | Not Started | 安装包冒烟测试 | 打包、许可决策 | 含 WebView2 引导 |
 | 29 | Portable | 便携版 | P1 | 6 | Not Started | 解压即用冒烟 | 打包方案（NEEDS_VERIFICATION） | 便携方案待定 |
 | 30 | GitHub Actions | CI 与 Release 自动化 | P1 | 0 | In Progress | CI 全绿 + Release 触发 | 工程骨架 | Phase 0 CI 骨架已完成；Release 流水线待 Phase 6 |
