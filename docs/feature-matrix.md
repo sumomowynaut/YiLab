@@ -26,7 +26,7 @@
 | 12 | 引擎参数 | Threads/Hash/MultiPV 等选项读写与持久化 | P1 | 3 | Not Started | setoption 往返测试 | UCI | 高级选项透传 |
 | 13 | 棋谱导入导出 | 通用导入导出框架 + 文件/粘贴/复制入口 | P0 | 2 | Not Started | 框架 + 往返测试 | 各格式适配器 | FEN/PGN/TXT 先行 |
 | 14 | XQF | XQF 二进制导入导出 | P1 | 4 | Not Started | 往返 + 样本库 | 格式调研（NEEDS_VERIFICATION） | 先导出后导入 |
-| 15 | PGN | 中国象棋 PGN 导入导出（变例/注释） | P0 | 2 | Not Started | 往返语义等价 | 导入导出框架 | 方言待定 |
+| 15 | PGN | 中国象棋 PGN 导入导出（变例/注释） | P0 | 2 | Done | 往返语义等价（8 集成 + 7 单元用例） | 导入导出框架 | UCI-Cyclone 记谱；中文纵线制导入不支持（NEEDS_VERIFICATION） |
 | 16 | TXT | 中文纵线制文本棋谱导入导出 | P1 | 2 | Not Started | 往返 + 换算边界 | 导入导出框架 | 线性为主 |
 | 17 | 东萍棋谱 | 东萍格式导入导出（支持变例） | P1 | 4 | Not Started | 往返 + 样本库 | 格式调研（NEEDS_VERIFICATION） | 语法待确认 |
 | 18 | 截图识别 | 棋盘图片识别局面（可人工校正） | P2 | 5 | Not Started | OCR 结构 + 校正 E2E | OCR 管线 | 可降级 |

@@ -5,6 +5,17 @@
 
 ## 当前阶段
 
+**PGN 导入导出 ✅ 完成（Phase 2 收尾）**
+
+- ✅ `src-tauri/src/io/pgn.rs`：PGN parser + exporter（`import` / `export`）。
+- ✅ 支持：Game metadata（`White`/`Black`/`Event`/`Date`/`Result`/`FEN`/自定义 `PikaXiangqiTitle`）、Moves、Variations（含嵌套）、Comments `{...}`、NAG（`! ? !! ?? !? ?! = ~` 与 `$n`）。
+- ✅ 走法记谱：UCI-Cyclone（如 `h2e2`）；中文纵线制导入暂不支持（`NEEDS_VERIFICATION`，见 `docs/import-export.md`）。
+- ✅ **变例归属修复**：导入保留回合前缀（`N.` 红 / `N...` 黑），变例首着按前缀沿祖先链定位分支点；主线续着经 `GameTree::insert_main_at` 始终落在 `children[0]`，解决「变例写在主线续着之前导致主/变例顺序颠倒」的问题。
+- ✅ 往返保证：`import(export(tree))` 在主线/变例/注释/NAG/头信息上等价；二次导出（Export → Import → Export）文本稳定。
+- ✅ Tauri 命令：`pgn_import` / `pgn_export`（`commands.rs`）。
+- ✅ 测试：Rust 单元 7（tokenize/NAG/round-trip 基础）+ 集成 8（树等价、二次导出稳定、手写 PGN、非法着法/括号/FEN 拒绝、根级变例、自定义 FEN）。
+- ⚪ 通用导入导出框架（Codec trait）、文件/粘贴/复制 UI 入口、TXT/XQF/东萍：后续 Phase。
+
 **Phase 3（Pikafish Engine）✅ 引擎层 + 分析 UI 完成**
 
 - ✅ `src-tauri/src/engine/`：Engine interface（`EngineManager`）、Engine Process（tokio 异步）、UCI parser / command builder。
@@ -48,7 +59,7 @@
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 66 lib + 10 engine_manager + 30 game_tree（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
+| `cargo test` | ✅ | 73 lib + 10 engine_manager + 30 game_tree + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
@@ -82,8 +93,9 @@
 
 ## 下一步
 
-1. Phase 3 续：引擎命令层 + Engine UI（引擎面板/MultiPV/评价曲线/自动复盘）。
-2. Phase 2 收尾：PGN / TXT 导入导出。
+1. Phase 4：导入导出 UI 入口（文件/粘贴/复制）+ 通用导入导出框架（Codec trait）+ TXT 导入导出。
+2. Phase 3 续：评价曲线 / 自动复盘 / 人机对弈循环。
+3. XQF / 东萍棋谱：需先完成格式调研（NEEDS_VERIFICATION，见 `docs/development-plan.md`）。
 
 ## 关键开放问题（NEEDS_VERIFICATION）
 
@@ -106,3 +118,4 @@
 | 2026-08-22 | 架构审查修复：H1 注释/NAG 按节点定位、H2 文档/会话状态边界 + tree_json 序列化、H3 快照去 parse_fen、M1 position 派生、M2 变例提升/排序、M3 attacks_square；提交 `fix: address game tree architecture review` |
 | 2026-08-22 | Pikafish 引擎层完成：Engine Manager/UCI 编解码/Mock 引擎/崩溃重启/超时/分析切换局面；真实 Pikafish 冒烟通过；提交 `feat: integrate pikafish engine` |
 | 2026-08-22 | 引擎分析 UI：Analysis Panel（评价/深度/NPS/PV/MultiPV）、参数面板、开始/停止/重启、PV 棋盘预览、切换局面防竞态；提交 `feat: add engine analysis interface` |
+| 2026-08-22 | PGN 导入导出完成：parser/exporter（元数据/变例/嵌套变例/注释/NAG）、回合前缀分支定位 + `insert_main_at` 修复主/变例顺序、round-trip 等价与二次导出稳定测试；提交 `feat: add pgn support` |

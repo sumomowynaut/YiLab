@@ -27,6 +27,22 @@ use super::nag::Nag;
 
 pub type NodeId = u64;
 
+impl GameNode {
+    /// 本节点着法是否红方所走（红方着法后轮到黑方）。
+    pub fn is_red(&self) -> bool {
+        self.side_to_move == Color::Black
+    }
+
+    /// 显示回合数（红方着法 N.，黑方着法 N…）。
+    pub fn move_number(&self) -> u32 {
+        if self.is_red() {
+            self.fullmove_number
+        } else {
+            self.fullmove_number.saturating_sub(1).max(1)
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GameNode {
     pub id: NodeId,
@@ -204,7 +220,18 @@ impl GameTree {
         self.insert_move_at(self.current, mv)
     }
 
+    /// 在父节点插入着法（追加为子节点末尾）；若该着法已存在则复用子节点。
     pub fn insert_move_at(&mut self, parent: NodeId, mv: Move) -> Result<NodeId, GameError> {
+        self.insert_child(parent, mv, false)
+    }
+
+    /// 在父节点插入着法作为主线续着（children[0]，已有子节点顺移）；同着法已存在则复用。
+    pub fn insert_main_at(&mut self, parent: NodeId, mv: Move) -> Result<NodeId, GameError> {
+        self.insert_child(parent, mv, true)
+    }
+
+    /// 共享插入逻辑：`main` 为 true 时插入到 children[0]，否则追加到末尾。
+    fn insert_child(&mut self, parent: NodeId, mv: Move, main: bool) -> Result<NodeId, GameError> {
         let parent_pos = self.restore_position(parent)?;
         let next = apply_move(&parent_pos, mv).ok_or(GameError::IllegalMove(mv.uci()))?;
         // 复用相同着法的既有子节点（避免重复分支）
@@ -232,7 +259,12 @@ impl GameTree {
                 children: Vec::new(),
             },
         );
-        self.node_mut(parent)?.children.push(id);
+        let children = &mut self.node_mut(parent)?.children;
+        if main {
+            children.insert(0, id);
+        } else {
+            children.push(id);
+        }
         self.current = id;
         self.redo_stack.clear();
         Ok(id)

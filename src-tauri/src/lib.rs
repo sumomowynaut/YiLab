@@ -4,6 +4,7 @@ pub mod board;
 mod commands;
 pub mod engine;
 pub mod game;
+pub mod io;
 
 /// 返回应用版本（来自 Cargo.toml）。
 #[tauri::command]
@@ -57,7 +58,9 @@ pub fn run() {
             commands::engine_set_position_and_go,
             commands::engine_stop,
             commands::engine_restart,
-            commands::engine_quit
+            commands::engine_quit,
+            commands::pgn_import,
+            commands::pgn_export
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

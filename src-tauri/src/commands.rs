@@ -412,3 +412,21 @@ pub async fn engine_quit() -> Result<(), String> {
     }
     Ok(())
 }
+
+// ===================== PGN 导入导出命令 =====================
+
+/// 从 PGN 文本导入棋谱并替换当前棋谱树。
+#[tauri::command]
+pub fn pgn_import(pgn: String) -> Result<GameSnapshot, String> {
+    let tree = crate::io::pgn::import(&pgn).map_err(game_err)?;
+    *game_tree().lock().map_err(game_err)? = tree;
+    game_snapshot_dto(&*game_tree().lock().map_err(game_err)?).map_err(game_err)
+}
+
+/// 导出当前棋谱树为 PGN 文本。
+#[tauri::command]
+pub fn pgn_export() -> Result<String, String> {
+    Ok(crate::io::pgn::export(
+        &*game_tree().lock().map_err(game_err)?,
+    ))
+}
