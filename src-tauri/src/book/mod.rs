@@ -150,6 +150,16 @@ pub fn recommend(moves: &[BookMove], strategy: BookStrategy) -> Option<BookMove>
     }
 }
 
+/// 脱库步数控制：`plies` 为从起点起的半回合数，`max_plies` 为 None 时不限制。
+///
+/// 语义对齐网页版「脱库步数 N」：前 N 个半回合内命中才走库，超过 N 步后交给引擎。
+pub fn within_book_plies(plies: u32, max_plies: Option<u32>) -> bool {
+    match max_plies {
+        None => true,
+        Some(max) => plies <= max,
+    }
+}
+
 /// 组合链：本地优先，未命中再查云库；云库失败/未命中静默回退。
 ///
 /// 这是对外暴露的统一入口，**永不失败**：云库错误被吞掉，返回当前可获得的最佳结果。
@@ -187,6 +197,20 @@ impl BookChain {
     /// 推荐一步着法（按策略）。
     pub fn recommend(&self, pos: &Position, strategy: BookStrategy) -> Option<BookMove> {
         recommend(&self.lookup(pos), strategy)
+    }
+
+    /// 自动走库推荐：超过脱库步数（半回合数）时返回 None（交给引擎）。
+    pub fn recommend_book(
+        &self,
+        pos: &Position,
+        strategy: BookStrategy,
+        plies: u32,
+        max_plies: Option<u32>,
+    ) -> Option<BookMove> {
+        if !within_book_plies(plies, max_plies) {
+            return None;
+        }
+        self.recommend(pos, strategy)
     }
 }
 
@@ -302,5 +326,41 @@ mod tests {
         let pos = crate::board::fen::parse_fen(START_FEN).unwrap();
         assert!(chain.lookup(&pos).is_empty());
         assert_eq!(chain.recommend(&pos, BookStrategy::BestScore), None);
+    }
+
+    #[test]
+    fn within_book_plies_gating() {
+        assert!(within_book_plies(0, None));
+        assert!(within_book_plies(100, None));
+        assert!(within_book_plies(5, Some(10)));
+        assert!(within_book_plies(10, Some(10))); // 边界：等于脱库步数仍走库
+        assert!(!within_book_plies(11, Some(10)));
+    }
+
+    #[test]
+    fn recommend_book_respects_exit_plies() {
+        let pos = crate::board::fen::parse_fen(START_FEN).unwrap();
+        let mut local = crate::book::local::LocalBookProvider::new();
+        local.add_entry(&pos, mv("h2e2"), 10, Some(stats(9, 0, 1)));
+        let chain = BookChain::local_only(Box::new(local));
+
+        assert_eq!(
+            chain
+                .recommend_book(&pos, BookStrategy::BestScore, 2, Some(4))
+                .unwrap()
+                .mv,
+            mv("h2e2")
+        );
+        assert_eq!(
+            chain.recommend_book(&pos, BookStrategy::BestScore, 5, Some(4)),
+            None
+        );
+        assert_eq!(
+            chain
+                .recommend_book(&pos, BookStrategy::BestScore, 99, None)
+                .unwrap()
+                .mv,
+            mv("h2e2")
+        );
     }
 }

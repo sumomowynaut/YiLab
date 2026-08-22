@@ -184,6 +184,45 @@ fn current_position_query_through_game_tree() {
     );
 }
 
+#[test]
+fn game_tree_current_plies_counts_half_moves() {
+    let mut tree = GameTree::new(START_FEN).unwrap();
+    assert_eq!(tree.current_plies(), 0);
+    tree.insert_move(mv("h2e2")).unwrap();
+    tree.insert_move(mv("h7e7")).unwrap();
+    tree.insert_move(mv("h0g2")).unwrap();
+    assert_eq!(tree.current_plies(), 3);
+    tree.go_to_start().unwrap();
+    assert_eq!(tree.current_plies(), 0);
+    tree.next_move().unwrap();
+    assert_eq!(tree.current_plies(), 1);
+}
+
+#[test]
+fn auto_play_book_move_respects_exit_plies() {
+    let pos = start();
+    let mut local = LocalBookProvider::new();
+    local.add_entry(&pos, mv("h2e2"), 100, Some(stats(90, 5, 5)));
+    let chain = BookChain::local_only(Box::new(local));
+
+    let mut tree = GameTree::new(START_FEN).unwrap();
+    // 第 0 半回合：脱库步数 4 内 → 走库
+    let within = chain.recommend_book(&pos, BookStrategy::BestScore, tree.current_plies(), Some(4));
+    assert!(within.is_some());
+    // 模拟已走 5 个半回合：脱库步数 4 外 → 不走库
+    let beyond = chain.recommend_book(&pos, BookStrategy::BestScore, 5, Some(4));
+    assert_eq!(beyond, None);
+    // 不限制脱库步数 → 始终可走库
+    let unlimited = chain.recommend_book(&pos, BookStrategy::BestScore, 5, None);
+    assert!(unlimited.is_some());
+    // 走库并推进棋谱树
+    let rec = chain
+        .recommend_book(&pos, BookStrategy::BestScore, 0, Some(4))
+        .unwrap();
+    tree.insert_move(rec.mv).unwrap();
+    assert_eq!(tree.current_plies(), 1);
+}
+
 /// 测试用：可控结果的 mock 提供者（模拟云库命中/失败）。
 struct MockProvider {
     name: &'static str,

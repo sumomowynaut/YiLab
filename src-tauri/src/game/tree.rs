@@ -189,6 +189,23 @@ impl GameTree {
         self.current
     }
 
+    /// 当前节点相对根节点的着法数（半回合数，供「脱库步数」等使用）。
+    pub fn current_plies(&self) -> u32 {
+        let mut plies = 0;
+        let mut cur = Some(self.current);
+        while let Some(id) = cur {
+            if let Some(n) = self.nodes.get(&id) {
+                if n.mv.is_some() {
+                    plies += 1;
+                }
+                cur = n.parent;
+            } else {
+                break;
+            }
+        }
+        plies
+    }
+
     pub fn redo_available(&self) -> bool {
         !self.redo_stack.is_empty()
     }

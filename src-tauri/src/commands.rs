@@ -465,16 +465,18 @@ pub fn book_recommend(strategy: String) -> Result<Option<BookMoveDto>, String> {
         .map(|b| BookMoveDto::from(&b)))
 }
 
-/// 自动走库：把推荐着法插入当前棋谱树（未命中则不改动，返回 applied=None）。
+/// 自动走库：把推荐着法插入当前棋谱树。
+/// `max_plies` 为「脱库步数」（半回合数），超过则不走库（未命中/脱库均返回 applied=None）。
 #[tauri::command]
-pub fn book_auto_move(strategy: String) -> Result<BookAutoMoveDto, String> {
+pub fn book_auto_move(strategy: String, max_plies: Option<u32>) -> Result<BookAutoMoveDto, String> {
     let strategy = parse_strategy(&strategy)?;
     let mut tree = game_tree().lock().map_err(game_err)?;
     let pos = tree.restore_position(tree.current_id()).map_err(game_err)?;
+    let plies = tree.current_plies();
     let recommended = book_chain()
         .lock()
         .map_err(game_err)?
-        .recommend(&pos, strategy);
+        .recommend_book(&pos, strategy, plies, max_plies);
     let applied = match recommended {
         Some(BookMove { mv, .. }) => {
             tree.insert_move(mv).map_err(game_err)?;
