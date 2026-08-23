@@ -54,7 +54,7 @@ async fn wait_finished(
     timeout(dur, async {
         loop {
             match rx.recv().await {
-                Ok(AnalysisEvent::Finished(assessments)) => return assessments,
+                Ok(AnalysisEvent::Finished { assessments }) => return assessments,
                 Ok(_) => {}
                 Err(_) => return Vec::new(),
             }
@@ -116,7 +116,7 @@ async fn stop_then_continue_resumes_analysis() {
     timeout(Duration::from_secs(10), async {
         loop {
             match rx.recv().await {
-                Ok(AnalysisEvent::Assessment(_)) => break,
+                Ok(AnalysisEvent::Assessment { .. }) => break,
                 Ok(_) => {}
                 Err(_) => panic!("事件通道关闭"),
             }

@@ -44,3 +44,11 @@ export interface BoardView {
   flipVertical: boolean;
   flipHorizontal: boolean;
 }
+
+/** 棋盘上的着法箭头（分析提示）。 */
+export interface BoardArrow {
+  from: Square;
+  to: Square;
+  color: string;
+  label: string;
+}

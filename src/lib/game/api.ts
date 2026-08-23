@@ -7,10 +7,12 @@ import type { GameSnapshot } from "./types";
 export interface GameApi {
   newGame(fen?: string): Promise<GameSnapshot>;
   snapshot(): Promise<GameSnapshot>;
-  /** 保存当前棋局到应用数据目录。 */
-  save(): Promise<void>;
-  /** 从应用数据目录载入上次保存的棋局。 */
+  /** 保存当前棋局到「文档/弈研YiLab」，返回保存的完整路径。 */
+  save(): Promise<string>;
+  /** 从「文档/弈研YiLab」载入上次保存的棋局。 */
   load(): Promise<GameSnapshot>;
+  /** 在资源管理器中打开棋谱保存目录。 */
+  openSaveDir(): Promise<void>;
   insertMove(mv: string): Promise<GameSnapshot>;
   navigate(nodeId: number): Promise<GameSnapshot>;
   previous(): Promise<GameSnapshot>;
@@ -30,7 +32,8 @@ export interface GameApi {
 export const tauriGameApi: GameApi = {
   newGame: (fen) => invokeCommand<GameSnapshot>("game_new", { fen: fen ?? "" }),
   snapshot: () => invokeCommand<GameSnapshot>("game_snapshot"),
-  save: () => invokeCommand<void>("game_save"),
+  save: () => invokeCommand<string>("game_save"),
+  openSaveDir: () => invokeCommand<void>("open_save_dir"),
   load: () => invokeCommand<GameSnapshot>("game_load"),
   insertMove: (mv) => invokeCommand<GameSnapshot>("game_insert_move", { mv }),
   navigate: (nodeId) => invokeCommand<GameSnapshot>("game_navigate", { nodeId }),
@@ -55,6 +58,9 @@ export const memoryGameApi: GameApi = {
   snapshot: async () => rootOnlySnapshot(),
   save: async () => {
     throw new Error("保存棋局需要 Tauri 环境");
+  },
+  openSaveDir: async () => {
+    throw new Error("打开保存目录需要 Tauri 环境");
   },
   load: async () => {
     throw new Error("载入棋局需要 Tauri 环境");

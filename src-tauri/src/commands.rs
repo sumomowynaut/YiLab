@@ -131,6 +131,27 @@ pub fn board_apply_moves(fen: String, moves: Vec<String>) -> Result<PositionDto,
     Ok(PositionDto::from_position(&end))
 }
 
+/// 把 FEN 局面中的一步着法（UCI）转成中文纵线制记谱（如 炮二平五）。
+#[tauri::command]
+pub fn board_move_to_chinese(fen: String, uci: String) -> Result<String, String> {
+    let pos = parse_fen(&fen)?;
+    let mv = Move::parse_uci(&uci).ok_or_else(|| format!("非法着法格式：{uci}"))?;
+    Ok(crate::board::chinese::move_to_chinese(&pos, &mv))
+}
+
+/// 把从 `fen` 局面开始的一串着法（UCI）依次转成中文纵线制记谱。
+#[tauri::command]
+pub fn board_moves_to_chinese(fen: String, moves: Vec<String>) -> Result<Vec<String>, String> {
+    let mut pos = parse_fen(&fen)?;
+    let mut out = Vec::with_capacity(moves.len());
+    for uci in moves {
+        let mv = Move::parse_uci(&uci).ok_or_else(|| format!("非法着法格式：{uci}"))?;
+        out.push(crate::board::chinese::move_to_chinese(&pos, &mv));
+        pos = apply_move(&pos, mv).ok_or_else(|| format!("非法着法：{uci}"))?;
+    }
+    Ok(out)
+}
+
 // ===================== 棋谱树（Game Tree）命令 =====================
 
 fn game_err<E: std::fmt::Display>(e: E) -> String {
@@ -277,7 +298,7 @@ pub fn game_reorder_variation(
 
 use crate::engine::manager::{discover_eval_file, EngineManager};
 use crate::engine::types::{EngineConfig, EngineStatus, GoParams};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -306,6 +327,63 @@ fn status_name(s: EngineStatus) -> &'static str {
         EngineStatus::Ready => "ready",
         EngineStatus::Searching => "searching",
         EngineStatus::Crashed => "crashed",
+    }
+}
+
+/// 扫描常见目录中的 Pikafish 可执行文件（.exe），供引擎选择下拉框使用。
+#[tauri::command]
+pub fn engine_discover_binaries() -> Vec<String> {
+    let mut roots: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        roots.push(cwd.clone());
+        roots.push(cwd.join("engine"));
+        roots.push(cwd.join("bin"));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            roots.push(parent.to_path_buf());
+            roots.push(parent.join("engine"));
+        }
+    }
+    let mut out: Vec<String> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    for root in roots {
+        collect_pikafish_exes(&root, 0, &mut out, &mut seen);
+    }
+    out.sort();
+    out
+}
+
+fn collect_pikafish_exes(
+    dir: &std::path::Path,
+    depth: u32,
+    out: &mut Vec<String>,
+    seen: &mut HashSet<String>,
+) {
+    if depth > 2 {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_pikafish_exes(&path, depth + 1, out, seen);
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        let lower = name.to_ascii_lowercase();
+        if lower.starts_with("pikafish") && lower.ends_with(".exe") {
+            if let Ok(canon) = path.canonicalize() {
+                let s = canon.to_string_lossy().to_string();
+                if seen.insert(s.clone()) {
+                    out.push(s);
+                }
+            }
+        }
     }
 }
 
@@ -839,27 +917,56 @@ pub fn gif_export_variation(
 
 // ===================== 当前棋局保存 / 恢复（B3 最小持久化） =====================
 
-/// 保存当前棋局到应用数据目录（固定文件名 current-game.json）。
+/// 保存当前棋局到用户「文档」目录下的 弈研YiLab 文件夹，并返回完整路径。
 #[tauri::command]
-pub fn game_save(app: AppHandle) -> Result<(), String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+pub fn game_save(app: AppHandle) -> Result<String, String> {
+    let dir = app
+        .path()
+        .document_dir()
+        .map(|d| d.join("弈研YiLab"))
+        .map_err(|e| e.to_string())?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join("current-game.json");
+    let path = dir.join("弈研棋谱.json");
     let tree = game_tree().lock().map_err(game_err)?;
     let json = crate::game::serialize::save_game(&tree).map_err(game_err)?;
     std::fs::write(&path, json).map_err(|e| format!("写入存档失败：{e}"))?;
-    Ok(())
+    Ok(path.to_string_lossy().to_string())
 }
 
-/// 从应用数据目录载入上次保存的棋局（恢复棋谱树 + 当前节点）。
+/// 从「文档/弈研YiLab」载入上次保存的棋局（恢复棋谱树 + 当前节点）。
 #[tauri::command]
 pub fn game_load(app: AppHandle) -> Result<GameSnapshot, String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let path = dir.join("current-game.json");
+    let dir = app
+        .path()
+        .document_dir()
+        .map(|d| d.join("弈研YiLab"))
+        .map_err(|e| e.to_string())?;
+    let path = dir.join("弈研棋谱.json");
     let json = std::fs::read_to_string(&path).map_err(|e| format!("未找到存档：{e}"))?;
     let tree = crate::game::serialize::load_game(&json).map_err(game_err)?;
     *game_tree().lock().map_err(game_err)? = tree;
     game_snapshot_dto(&*game_tree().lock().map_err(game_err)?).map_err(game_err)
+}
+
+/// 在资源管理器中打开棋谱保存目录（文档/弈研YiLab）。
+#[tauri::command]
+pub fn open_save_dir(app: AppHandle) -> Result<(), String> {
+    let dir = app
+        .path()
+        .document_dir()
+        .map(|d| d.join("弈研YiLab"))
+        .map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = dir;
+    Ok(())
 }
 
 #[cfg(test)]

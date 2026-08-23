@@ -11,17 +11,15 @@ import { AnalysisReport } from "./components/analysis/AnalysisReport";
 import { GifExportPanel } from "./components/gif/GifExportPanel";
 import { GameCodec } from "./components/io/GameCodec";
 import { OcrPanel } from "./components/ocr/OcrPanel";
-import { BookPanel } from "./components/book/BookPanel";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { getDefaultBoardApi } from "./lib/board/api";
-import { sideToColor } from "./lib/board/notation";
+import { moveFromUci, pieceGlyph, sideToColor } from "./lib/board/notation";
 import { getDefaultEngineApi } from "./lib/engine/api";
 import { getDefaultGameApi } from "./lib/game/api";
 import { getDefaultIoApi } from "./lib/io/api";
 import { getDefaultOcrApi } from "./lib/ocr/api";
 import { getDefaultAnalysisApi } from "./lib/analysis/api";
 import { getDefaultGifApi } from "./lib/gif/api";
-import { getDefaultBookApi } from "./lib/book/api";
 import { useEngineStore } from "./stores/useEngineStore";
 import { useThemeStore } from "./stores/useThemeStore";
 import { useCurveStore } from "./stores/useCurveStore";
@@ -29,13 +27,27 @@ import { useAnalysisStore } from "./stores/useAnalysisStore";
 import { selectDisplayPosition, useGameStore } from "./stores/useGameStore";
 import type { VariationOption } from "./lib/gif/types";
 import type { TreeNodeDto } from "./lib/game/types";
+import type { BoardArrow } from "./lib/board/types";
 
-type TabKey = "game" | "analysis" | "book" | "io" | "settings";
+type TabKey = "game" | "analysis" | "io" | "settings";
+
+/** 在棋谱树中按 id 查找节点（曲线标注当前着法用）。 */
+function findTreeNode(tree: TreeNodeDto, id: number): TreeNodeDto | null {
+  if (tree.id === id) {
+    return tree;
+  }
+  for (const child of tree.children) {
+    const hit = findTreeNode(child, id);
+    if (hit) {
+      return hit;
+    }
+  }
+  return null;
+}
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "game", label: "棋谱" },
   { key: "analysis", label: "分析" },
-  { key: "book", label: "开局库" },
   { key: "io", label: "导入导出" },
   { key: "settings", label: "设置" },
 ];
@@ -76,6 +88,9 @@ function App() {
   const adoptSnapshot = useGameStore((state) => state.adoptSnapshot);
   const saveGame = useGameStore((state) => state.saveGame);
   const loadGame = useGameStore((state) => state.loadGame);
+  const newGame = useGameStore((state) => state.newGame);
+  const openSaveDir = useGameStore((state) => state.openSaveDir);
+  const boardApi = useGameStore((state) => state.boardApi);
 
   // 收集变例节点（GIF「指定变例」来源）
   const variations = useMemo(() => {
@@ -96,6 +111,7 @@ function App() {
     }
     return out;
   }, [snapshot]);
+
   const theme = useThemeStore((state) => state.theme);
   const initTheme = useThemeStore((state) => state.initTheme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
@@ -117,8 +133,29 @@ function App() {
   const engineMessage = useEngineStore((state) => state.message);
   const analysisEnabled = useEngineStore((state) => state.analysisEnabled);
   const preview = useEngineStore((state) => state.preview);
+
+  // 分析着法箭头：每个 MultiPV 主变的首着，颜色区分，标注 MultiPV 序号。
+  const engineArrows = useMemo<BoardArrow[]>(() => {
+    const colors = ["#dc2626", "#ea580c", "#2563eb", "#16a34a", "#9333ea"];
+    return Object.entries(engineLines)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([multipv, line]) => {
+        const mv = line.pv[0];
+        const parsed = mv ? moveFromUci(mv) : null;
+        return parsed
+          ? {
+              from: parsed.from,
+              to: parsed.to,
+              color: colors[Number(multipv) - 1] ?? "#6b7280",
+              label: multipv,
+            }
+          : null;
+      })
+      .filter((a): a is BoardArrow => a !== null);
+  }, [engineLines]);
   const engineInit = useEngineStore((state) => state.init);
   const engineStart = useEngineStore((state) => state.start);
+  const settings = useEngineStore((state) => state.settings);
   const engineStop = useEngineStore((state) => state.stop);
   const engineRestart = useEngineStore((state) => state.restart);
   const engineStartAnalysis = useEngineStore((state) => state.startAnalysis);
@@ -127,10 +164,11 @@ function App() {
   const [tab, setTab] = useState<TabKey>("game");
   const [fenInput, setFenInput] = useState("");
   const [commentDraft, setCommentDraft] = useState("");
+  const [chinesePv, setChinesePv] = useState<Record<number, string[]>>({});
+  const [chineseBestMove, setChineseBestMove] = useState<string | null>(null);
   const [ioApi] = useState(() => getDefaultIoApi());
   const [ocrApi] = useState(() => getDefaultOcrApi());
   const [gifApi] = useState(() => getDefaultGifApi());
-  const [bookApi] = useState(() => getDefaultBookApi());
 
   useEffect(() => {
     void init(getDefaultGameApi(), getDefaultBoardApi());
@@ -153,11 +191,53 @@ function App() {
 
   // 分析开启时：切换棋步 → 对新局面发起分析（引擎内部 stop→position→go）
   const currentFen = snapshot?.currentFen ?? null;
+
+  // 把引擎各主变 PV / 最佳着法转成中文记谱（异步，避免在渲染里阻塞）。
+  useEffect(() => {
+    if (!boardApi || !currentFen) return;
+    let cancelled = false;
+    const next: Record<number, string[]> = {};
+    const tasks: Promise<void>[] = [];
+    for (const [multipv, line] of Object.entries(engineLines)) {
+      if (line.pv.length === 0) continue;
+      tasks.push(
+        boardApi
+          .movesToChinese(currentFen, line.pv)
+          .then((cn) => {
+            if (!cancelled) next[Number(multipv)] = cn;
+          })
+          .catch(() => {}),
+      );
+    }
+    if (engineBestMove) {
+      tasks.push(
+        boardApi
+          .movesToChinese(currentFen, [engineBestMove.mv])
+          .then((cn) => {
+            if (!cancelled) setChineseBestMove(cn[0] ?? null);
+          })
+          .catch(() => {}),
+      );
+    }
+    Promise.all(tasks).then(() => {
+      if (!cancelled) setChinesePv(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [boardApi, currentFen, engineLines, engineBestMove]);
   useEffect(() => {
     if (analysisEnabled && currentFen) {
       void engineStartAnalysis(currentFen);
     }
   }, [currentFen, analysisEnabled, engineStartAnalysis]);
+
+  // 已填引擎路径且引擎未启动时，自动开始持续分析（无需每次点「开始」）。
+  useEffect(() => {
+    if (engineStatus === "stopped" && settings.programPath.trim() !== "") {
+      void engineStart();
+    }
+  }, [engineStatus, settings.programPath, engineStart]);
 
   // 同步注释草稿
   useEffect(() => {
@@ -175,8 +255,16 @@ function App() {
       return;
     }
     const fromRed = position.sideToMove === "w" ? score.cp : -score.cp;
-    curveRecord(currentFen, fromRed);
-  }, [analysisEnabled, currentFen, position, engineLines, curveRecord]);
+    const node = snapshot ? findTreeNode(snapshot.tree, snapshot.currentId) : null;
+    const turnLabel =
+      node && node.moveNumber
+        ? `第 ${node.moveNumber} 回合 · ${node.isRed ? "红" : "黑"}`
+        : undefined;
+    curveRecord(currentFen, fromRed, {
+      moveLabel: node?.chineseMv || node?.mv || undefined,
+      turnLabel,
+    });
+  }, [analysisEnabled, currentFen, position, snapshot, engineLines, curveRecord]);
 
   // 全局快捷键：←/→ 导航、Home/End 首尾、F/M 翻转/镜像、Space 分析启停、Ctrl+Z/Y 悔棋/重做
   useShortcuts({
@@ -230,14 +318,20 @@ function App() {
   }
 
   const sideLabel = sideToColor(position.sideToMove) === "red" ? "红方" : "黑方";
+  const toolLabel =
+    tool === "eraser"
+      ? "橡皮擦"
+      : tool
+        ? `${tool.color === "red" ? "红" : "黑"}${pieceGlyph({ color: tool.color, kind: tool.kind })}`
+        : "未选择";
 
   return (
     <main className="flex min-h-screen items-start justify-center bg-background p-3 text-foreground sm:p-6">
       <Card className="w-full max-w-7xl">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>PikaXiangqi</CardTitle>
-            <CardDescription>中国象棋复盘与分析 — 本地优先 · 引擎分析 · 自动复盘</CardDescription>
+            <CardTitle>弈研 YiLab</CardTitle>
+            <CardDescription>中国象棋复盘与 AI 分析 · 本地优先</CardDescription>
           </div>
           <Button
             variant="outline"
@@ -252,7 +346,7 @@ function App() {
 
         <CardContent className="flex flex-col gap-5 xl:flex-row">
           {/* 左列：棋盘为视觉中心 */}
-          <div className="flex flex-col gap-3 xl:w-[440px] xl:shrink-0">
+          <div className="flex flex-col gap-3 xl:w-[560px] xl:shrink-0">
             {preview && (
               <div className="flex items-center gap-2 rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs text-blue-700">
                 <span>
@@ -268,6 +362,7 @@ function App() {
               selected={selected}
               legalTargets={legalTargets}
               view={view}
+              arrows={!preview && analysisEnabled ? engineArrows : []}
               onSquareClick={(sq) => {
                 if (preview) {
                   engineClearPreview();
@@ -295,6 +390,14 @@ function App() {
 
             {/* 导航工具栏 */}
             <div className="flex flex-wrap items-center gap-1">
+              <Button
+                variant="default"
+                size="sm"
+                data-testid="game-new"
+                onClick={() => void newGame()}
+              >
+                新建棋局
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -376,6 +479,10 @@ function App() {
             {editing && (
               <div className="flex flex-col gap-2 rounded border p-3">
                 <PiecePalette tool={tool} onSelect={setTool} />
+                <p className="text-xs text-muted-foreground">
+                  当前棋子：<span className="font-semibold">{toolLabel}</span>
+                  {!tool && "（请先在上方面板点选一枚棋子，再点棋盘格子放置）"}
+                </p>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => void toggleSide()}>
                     切换先手方
@@ -431,6 +538,15 @@ function App() {
                     onClick={() => void loadGame()}
                   >
                     载入棋局
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="game-open-dir"
+                    onClick={() => void openSaveDir()}
+                  >
+                    打开保存目录
                   </Button>
                 </div>
 
@@ -529,6 +645,8 @@ function App() {
                       void enginePreviewPv(pv, snapshot.currentFen);
                     }
                   }}
+                  pvCn={chinesePv}
+                  bestMoveCn={chineseBestMove}
                 />
                 <EvalCurve points={curvePoints} onClear={curveClear} />
                 <AnalysisReport
@@ -543,14 +661,6 @@ function App() {
                   onNavigate={(nodeId) => void navigate(nodeId)}
                 />
               </div>
-            )}
-
-            {tab === "book" && (
-              <BookPanel
-                bookApi={bookApi}
-                currentFen={currentFen}
-                onAutoMove={(snap) => adoptSnapshot(snap)}
-              />
             )}
 
             {tab === "io" && (

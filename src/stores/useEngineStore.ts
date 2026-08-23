@@ -19,13 +19,16 @@ const SETTINGS_KEY = "pikaxiangqi-engine-settings";
 
 const DEFAULT_SETTINGS: EngineSettings = {
   programPath: "",
-  threads: 1,
-  hash: 16,
+  threads: 4,
+  hash: 128,
   depth: null,
   multipv: 1,
 };
 
-const MULTIPV_OPTIONS = [1, 2, 3, 5, 10];
+export const MULTIPV_OPTIONS = [1, 2, 3, 5, 10];
+export const THREADS_OPTIONS = [1, 2, 4, 6, 8, 12, 16];
+export const HASH_OPTIONS = [16, 32, 64, 128, 256, 512, 1024];
+export const DEPTH_OPTIONS = [0, 5, 10, 15, 20, 25, 30];
 
 function loadSettings(): EngineSettings {
   try {
@@ -149,6 +152,10 @@ export const useEngineStore = create<EngineState>((set, get) => ({
     set({ message: null });
     try {
       const engineId = await api.start(settings.programPath);
+      // 引擎每次启动/重启都会清空选项，这里重新应用保存的参数
+      await api.setOption("Threads", String(settings.threads));
+      await api.setOption("Hash", String(settings.hash));
+      await api.setOption("MultiPV", String(settings.multipv));
       set({ engineId, analysisEnabled: true, status: "ready", message: null });
     } catch (error) {
       set({ message: String(error), analysisEnabled: false });
@@ -167,11 +174,15 @@ export const useEngineStore = create<EngineState>((set, get) => ({
   },
 
   async restart() {
-    const { api } = get();
+    const { api, settings } = get();
     if (!api) return;
     set({ message: null });
     try {
       await api.restart();
+      // 重启后同样重新应用参数
+      await api.setOption("Threads", String(settings.threads));
+      await api.setOption("Hash", String(settings.hash));
+      await api.setOption("MultiPV", String(settings.multipv));
       set({ analysisEnabled: true, status: "ready", message: null });
     } catch (error) {
       set({ message: String(error), analysisEnabled: false });
@@ -185,7 +196,8 @@ export const useEngineStore = create<EngineState>((set, get) => ({
     const next = { ...settings, ...patch };
     set({ settings: next });
     saveSettings(next);
-    if (!api) return;
+    // 引擎未启动时只保存；启动/重启时会自动应用
+    if (!api || get().status === "stopped") return;
     try {
       await api.setOption("Threads", String(next.threads));
       await api.setOption("Hash", String(next.hash));
@@ -205,9 +217,10 @@ export const useEngineStore = create<EngineState>((set, get) => ({
       lines: {},
       bestMove: null,
     }));
+    // 实时分析始终持续（infinite），避免有穷深度下 2ms 就出 bestmove 造成页面反复刷新。
     const params = {
-      infinite: settings.depth == null,
-      depth: settings.depth,
+      infinite: true,
+      depth: null,
       movetimeMs: null,
       nodes: null,
     };

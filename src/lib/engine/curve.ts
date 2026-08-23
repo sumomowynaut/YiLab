@@ -5,6 +5,10 @@ export interface CurvePoint {
   fen: string;
   /** 红方视角分数（centipawns）。 */
   scoreCp: number;
+  /** 走到该局面的着法（如 炮二平五），根节点为空。 */
+  moveLabel?: string;
+  /** 展示用回合信息（如 第 10 回合 · 红）。 */
+  turnLabel?: string;
 }
 
 export const WIDTH = 280;

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "PikaXiangqi",
+  "productName": "弈研 YiLab",
   "version": "0.1.0",
   "identifier": "com.pikaxiangqi.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "PikaXiangqi",
+        "title": "弈研 YiLab",
         "width": 1200,
         "height": 800,
         "minWidth": 900,

@@ -6,6 +6,8 @@ export interface TreeNodeDto {
   id: number;
   /** 本节点着法（UCI），根节点为 null。 */
   mv: string | null;
+  /** 本节点着法的中文纵线制记谱（如 炮二平五），根节点为空字符串。 */
+  chineseMv?: string;
   /** 显示回合数（红方 N.，黑方 N…）。 */
   moveNumber: number;
   isRed: boolean;

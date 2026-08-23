@@ -6,10 +6,15 @@ import {
   screenFileOf,
   screenRankOf,
 } from "../../lib/board/notation";
-import type { BoardView, PositionSnapshot, Square } from "../../lib/board/types";
+import type { BoardArrow, BoardView, PositionSnapshot, Square } from "../../lib/board/types";
 
 const CELL = 56;
-const PAD = 40;
+const PAD = 52;
+
+/** 红方纵线号：file 0(a, 红左)=九 … file 8(i, 红右)=一（从红方视角右→左）。 */
+const RED_FILE_LABELS = ["九", "八", "七", "六", "五", "四", "三", "二", "一"];
+/** 黑方纵线号：file 0(黑右)=1 … file 8(黑左)=9（从黑方视角右→左）。 */
+const BLACK_FILE_LABELS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 export interface BoardProps {
   position: PositionSnapshot;
@@ -17,10 +22,41 @@ export interface BoardProps {
   legalTargets: Square[];
   view: BoardView;
   onSquareClick: (sq: Square) => void;
+  /** 分析着法箭头（MultiPV 提示）。 */
+  arrows?: BoardArrow[];
 }
 
-/** 中国象棋棋盘（SVG 渲染，10×9，可翻转/镜像视图）。 */
-export function Board({ position, selected, legalTargets, view, onSquareClick }: BoardProps) {
+/** 计算一条箭头（含箭头头部）的 SVG 路径数据。 */
+function arrowGeometry(sx: number, sy: number, tx: number, ty: number) {
+  const dx = tx - sx;
+  const dy = ty - sy;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const back = CELL * 0.16;
+  const head = CELL * 0.3;
+  const endX = tx - ux * back;
+  const endY = ty - uy * back;
+  const baseX = endX - ux * head;
+  const baseY = endY - uy * head;
+  const px = -uy;
+  const py = ux;
+  const w = head * 0.4;
+  return {
+    line: `M${sx.toFixed(1)} ${sy.toFixed(1)} L${endX.toFixed(1)} ${endY.toFixed(1)}`,
+    head: `${endX.toFixed(1)},${endY.toFixed(1)} ${(baseX + px * w).toFixed(1)},${(baseY + py * w).toFixed(1)} ${(baseX - px * w).toFixed(1)},${(baseY - py * w).toFixed(1)}`,
+  };
+}
+
+/** 中国象棋棋盘（SVG 渲染，10×9，可翻转/镜像视图；纵线号采用传统记谱法）。 */
+export function Board({
+  position,
+  selected,
+  legalTargets,
+  view,
+  onSquareClick,
+  arrows = [],
+}: BoardProps) {
   const width = PAD * 2 + (NUM_FILES - 1) * CELL;
   const height = PAD * 2 + (NUM_RANKS - 1) * CELL;
   const x = (file: number) => PAD + file * CELL;
@@ -29,17 +65,44 @@ export function Board({ position, selected, legalTargets, view, onSquareClick }:
   const targetKeys = new Set(legalTargets.map((t) => `${t.file}${t.rank}`));
   const selectedKey = selected ? `${selected.file}${selected.rank}` : null;
 
-  const verticals = Array.from({ length: NUM_FILES }, (_, file) => (
-    <line
-      key={`v${file}`}
-      x1={x(file)}
-      y1={y(0)}
-      x2={x(file)}
-      y2={y(NUM_RANKS - 1)}
-      stroke="#5b3a1e"
-      strokeWidth={1.5}
-    />
-  ));
+  // 竖线：左右边框连续；中间竖线在「楚河汉界」处断开（河界为空白带）。
+  const verticals: ReactElement[] = [];
+  for (let file = 0; file < NUM_FILES; file++) {
+    if (file === 0 || file === NUM_FILES - 1) {
+      verticals.push(
+        <line
+          key={`v${file}`}
+          x1={x(file)}
+          y1={y(0)}
+          x2={x(file)}
+          y2={y(NUM_RANKS - 1)}
+          stroke="#5b3a1e"
+          strokeWidth={1.5}
+        />,
+      );
+    } else {
+      verticals.push(
+        <line
+          key={`v${file}-top`}
+          x1={x(file)}
+          y1={y(0)}
+          x2={x(file)}
+          y2={y(4)}
+          stroke="#5b3a1e"
+          strokeWidth={1.5}
+        />,
+        <line
+          key={`v${file}-bottom`}
+          x1={x(file)}
+          y1={y(5)}
+          x2={x(file)}
+          y2={y(NUM_RANKS - 1)}
+          stroke="#5b3a1e"
+          strokeWidth={1.5}
+        />,
+      );
+    }
+  }
 
   const horizontals = Array.from({ length: NUM_RANKS }, (_, rank) => (
     <line
@@ -96,6 +159,13 @@ export function Board({ position, selected, legalTargets, view, onSquareClick }:
           onClick={() => onSquareClick({ rank, file })}
           style={{ cursor: "pointer" }}
         >
+          <rect
+            x={x(sFile) - CELL / 2}
+            y={y(sRank) - CELL / 2}
+            width={CELL}
+            height={CELL}
+            fill="transparent"
+          />
           {isSelected && (
             <circle cx={x(sFile)} cy={y(sRank)} r={CELL * 0.48} fill="rgba(250, 204, 21, 0.45)" />
           )}
@@ -138,36 +208,77 @@ export function Board({ position, selected, legalTargets, view, onSquareClick }:
     }
   }
 
-  const fileLabels = Array.from({ length: NUM_FILES }, (_, file) => (
+  // 传统记谱法纵线号：红方在红方一侧、黑方在黑方一侧，各从本方视角「从右到左」。
+  const redScreenRank = screenRankOf(0, view);
+  const blackScreenRank = screenRankOf(NUM_RANKS - 1, view);
+  const redLabelY = redScreenRank === 0 ? 18 : height - 16;
+  const blackLabelY = blackScreenRank === 0 ? 18 : height - 16;
+
+  const redFileLabels = Array.from({ length: NUM_FILES }, (_, file) => (
     <text
-      key={`fl${file}`}
-      x={x(file)}
-      y={height - 12}
+      key={`red-file-${file}`}
+      x={x(screenFileOf(file, view))}
+      y={redLabelY}
       textAnchor="middle"
       fontSize={12}
-      fill="#8a6a3b"
+      fill="#7a4a1e"
     >
-      {String.fromCharCode(97 + file)}
+      {RED_FILE_LABELS[file]}
     </text>
   ));
 
-  const rankLabels = Array.from({ length: NUM_RANKS }, (_, rank) => (
-    <text key={`rl${rank}`} x={12} y={y(rank) + 4} textAnchor="middle" fontSize={12} fill="#8a6a3b">
-      {rank}
+  const blackFileLabels = Array.from({ length: NUM_FILES }, (_, file) => (
+    <text
+      key={`black-file-${file}`}
+      x={x(screenFileOf(file, view))}
+      y={blackLabelY}
+      textAnchor="middle"
+      fontSize={12}
+      fill="#7a4a1e"
+    >
+      {BLACK_FILE_LABELS[file]}
     </text>
   ));
+
+  // 分析箭头：从起点到终点，带箭头头部；可选标注（MultiPV 序号）。
+  const arrowEls = arrows.map((a, i) => {
+    const sx = x(screenFileOf(a.from.file, view));
+    const sy = y(screenRankOf(a.from.rank, view));
+    const tx = x(screenFileOf(a.to.file, view));
+    const ty = y(screenRankOf(a.to.rank, view));
+    const g = arrowGeometry(sx, sy, tx, ty);
+    return (
+      <g key={`arrow-${i}`} data-testid={`arrow-${i}`}>
+        <path d={g.line} stroke={a.color} strokeWidth={5} fill="none" opacity={0.55} strokeLinecap="round" />
+        <path d={`M${g.head} Z`} fill={a.color} opacity={0.85} />
+        {a.label && (
+          <text
+            x={sx + (tx - sx) * 0.28}
+            y={sy + (ty - sy) * 0.28 - 8}
+            textAnchor="middle"
+            fontSize={15}
+            fontWeight={800}
+            fill={a.color}
+            stroke="#fff"
+            strokeWidth={2}
+            paintOrder="stroke"
+          >
+            {a.label}
+          </text>
+        )}
+      </g>
+    );
+  });
 
   const riverY = (y(4) + y(5)) / 2;
 
   return (
     <svg
-      width={width}
-      height={height}
       viewBox={`0 0 ${width} ${height}`}
       data-testid="board"
       role="img"
       aria-label="中国象棋棋盘"
-      className="select-none"
+      className="block h-auto w-full max-w-[560px] select-none"
     >
       <rect x={0} y={0} width={width} height={height} rx={8} fill="#e8c39e" />
       {verticals}
@@ -180,8 +291,9 @@ export function Board({ position, selected, legalTargets, view, onSquareClick }:
         汉 界
       </text>
       {squares}
-      {fileLabels}
-      {rankLabels}
+      {arrowEls}
+      {redFileLabels}
+      {blackFileLabels}
     </svg>
   );
 }

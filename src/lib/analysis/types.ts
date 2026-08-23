@@ -6,8 +6,12 @@ export interface MoveAssessmentDto {
   nodeId: number;
   /** 实际着法（UCI）。 */
   mv: string;
+  /** 实际着法（中文纵线制）。 */
+  mvCn?: string;
   /** 最佳着法（UCI）。 */
   bestMove: string;
+  /** 最佳着法（中文纵线制）。 */
+  bestMoveCn?: string;
   /** 走前评价（红方视角，厘兵）。 */
   evalBeforeCp: number;
   /** 走后评价（红方视角，厘兵）。 */
@@ -16,6 +20,8 @@ export interface MoveAssessmentDto {
   lossCp: number;
   depth: number;
   pv: string[];
+  /** PV（中文纵线制）。 */
+  pvCn?: string[];
   category: AnalysisCategory;
 }
 

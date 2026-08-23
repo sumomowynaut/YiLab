@@ -33,6 +33,9 @@ interface GameState {
   saveGame: () => Promise<void>;
   /** 从应用数据目录载入上次保存的棋局。 */
   loadGame: () => Promise<void>;
+  /** 在资源管理器中打开保存目录。 */
+  openSaveDir: () => Promise<void>;
+  newGame: () => Promise<void>;
   handleSquareClick: (sq: Square) => Promise<void>;
   toggleEditing: () => Promise<void>;
   setTool: (tool: Tool) => void;
@@ -81,7 +84,7 @@ export const useGameStore = create<GameState>((set, get) => {
     legalTargets: [],
     editing: false,
     tool: null,
-    view: { flipVertical: false, flipHorizontal: false },
+    view: { flipVertical: true, flipHorizontal: false },
     message: null,
     expandedVariations: [],
 
@@ -101,8 +104,18 @@ export const useGameStore = create<GameState>((set, get) => {
       const { api } = get();
       if (!api) return;
       try {
-        await api.save();
-        set({ message: "已保存当前棋局" });
+        const path = await api.save();
+        set({ message: `已保存：${path}` });
+      } catch (error) {
+        set({ message: String(error) });
+      }
+    },
+
+    async openSaveDir() {
+      const { api } = get();
+      if (!api) return;
+      try {
+        await api.openSaveDir();
       } catch (error) {
         set({ message: String(error) });
       }
@@ -115,6 +128,18 @@ export const useGameStore = create<GameState>((set, get) => {
         const snapshot = await api.load();
         applySnapshot(snapshot);
         set({ message: "已载入上次保存的棋局" });
+      } catch (error) {
+        set({ message: String(error) });
+      }
+    },
+
+    async newGame() {
+      const { api } = get();
+      if (!api) return;
+      try {
+        const snapshot = await api.newGame();
+        applySnapshot(snapshot);
+        set({ editing: false, editPosition: null, validation: null, message: "已新建棋局" });
       } catch (error) {
         set({ message: String(error) });
       }

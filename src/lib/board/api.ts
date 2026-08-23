@@ -17,6 +17,8 @@ export interface BoardApi {
   makeMove(fen: string, mv: string): Promise<PositionSnapshot>;
   /** 依序应用一串着法（PV 预览用）。 */
   applyMoves(fen: string, moves: string[]): Promise<PositionSnapshot>;
+  /** 把一串着法转成中文纵线制记谱。 */
+  movesToChinese(fen: string, moves: string[]): Promise<string[]>;
   validate(fen: string): Promise<ValidationResult>;
   rotate(fen: string, mode: "180" | "mirror"): Promise<PositionSnapshot>;
   setPiece(
@@ -40,6 +42,8 @@ export const tauriBoardApi: BoardApi = {
   legalMoves: (fen) => invokeCommand<string[]>("board_legal_moves", { fen }),
   makeMove: (fen, mv) => invokeCommand<PositionSnapshot>("board_make_move", { fen, mv }),
   applyMoves: (fen, moves) => invokeCommand<PositionSnapshot>("board_apply_moves", { fen, moves }),
+  movesToChinese: (fen, moves) =>
+    invokeCommand<string[]>("board_moves_to_chinese", { fen, moves }),
   validate: (fen) => invokeCommand<ValidationResult>("board_validate", { fen }),
   rotate: (fen, mode) => invokeCommand<PositionSnapshot>("board_rotate", { fen, mode }),
   setPiece: async (fen, square, color, kind) => {
@@ -90,6 +94,9 @@ export const memoryBoardApi: BoardApi = {
   },
   applyMoves: async () => {
     throw new Error("PV 预览需要 Tauri 环境（Rust 规则核心）");
+  },
+  movesToChinese: async () => {
+    throw new Error("中文记谱需要 Tauri 环境（Rust 规则核心）");
   },
   validate: async () => ({ ok: true, issues: [] }),
   rotate: async (fen) => parseFen(fen),

@@ -10,6 +10,10 @@ export interface AnalysisPanelProps {
   onStop: () => void;
   onRestart: () => void;
   onPreview: (pv: string[]) => void;
+  /** 各 MultiPV 主变的中文纵线制 PV（缺省时回退 UCI）。 */
+  pvCn?: Record<number, string[]>;
+  /** 最佳着法的中文纵线制记谱（缺省时回退 UCI）。 */
+  bestMoveCn?: string | null;
 }
 
 function formatScore(score: InfoLineDto["score"]): string {
@@ -59,6 +63,8 @@ export function AnalysisPanel({
   onStop,
   onRestart,
   onPreview,
+  pvCn,
+  bestMoveCn,
 }: AnalysisPanelProps) {
   const sorted = Object.values(lines).sort((a, b) => a.multipv - b.multipv);
   const running = status === "searching";
@@ -108,7 +114,7 @@ export function AnalysisPanel({
 
       {bestMove && (
         <p className="text-xs text-muted-foreground" data-testid="engine-bestmove">
-          最佳着法：<span className="font-mono text-foreground">{bestMove.mv}</span>
+          最佳着法：<span className="font-mono text-foreground">{bestMoveCn || bestMove.mv}</span>
           {bestMove.ponder ? ` （应着 ${bestMove.ponder}）` : ""}
         </p>
       )}
@@ -120,6 +126,17 @@ export function AnalysisPanel({
       )}
 
       <div className="flex flex-col gap-1" data-testid="engine-lines">
+        <div
+          className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground"
+          data-testid="engine-line-header"
+        >
+          <span className="w-4">#</span>
+          <span className="w-14">分数(红方)</span>
+          <span className="w-8">深度</span>
+          <span className="w-16 text-right">节点</span>
+          <span className="w-16 text-right">NPS</span>
+          <span className="w-12 text-right">用时</span>
+        </div>
         {sorted.map((info) => (
           <button
             key={info.multipv}
@@ -145,10 +162,10 @@ export function AnalysisPanel({
               className="flex flex-wrap gap-0.5 pt-0.5 font-mono"
               data-testid={`engine-pv-${info.multipv}`}
             >
-              {info.pv.length === 0 ? (
+              {(pvCn?.[info.multipv] ?? info.pv).length === 0 ? (
                 <span className="text-muted-foreground">（暂无 PV）</span>
               ) : (
-                info.pv.map((mv, i) => (
+                (pvCn?.[info.multipv] ?? info.pv).map((mv, i) => (
                   <span key={`${mv}-${i}`} className="rounded bg-muted px-0.5">
                     {mv}
                   </span>
@@ -158,6 +175,10 @@ export function AnalysisPanel({
           </button>
         ))}
       </div>
+      <p className="text-[10px] text-muted-foreground" data-testid="engine-stats-hint">
+        NPS = 每秒计算节点数（越高越快，受 CPU 核心/线程数影响，可在设置里调高 Threads）；
+        分数正=红方优势、负=黑方优势。
+      </p>
     </div>
   );
 }

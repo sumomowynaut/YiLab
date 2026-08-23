@@ -76,6 +76,8 @@ pub struct GoParams {
     pub depth: Option<u32>,
     pub movetime_ms: Option<u64>,
     pub nodes: Option<u64>,
+    /// 限定搜索的着法（可缺省，缺省=不限定）。
+    #[serde(default)]
     pub searchmoves: Vec<String>,
     pub wtime_ms: Option<u64>,
     pub btime_ms: Option<u64>,

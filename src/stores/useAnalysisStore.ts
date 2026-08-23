@@ -36,17 +36,24 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
           set({ progress: ev.done, total: ev.total });
           break;
         case "assessment":
-          set((s) => {
-            const exists = s.assessments.some((a) => a.nodeId === ev.assessment.nodeId);
-            return {
-              assessments: exists
-                ? s.assessments.map((a) => (a.nodeId === ev.assessment.nodeId ? ev.assessment : a))
-                : [...s.assessments, ev.assessment],
-            };
-          });
+          if (ev.assessment) {
+            set((s) => {
+              const exists = s.assessments.some((a) => a.nodeId === ev.assessment.nodeId);
+              return {
+                assessments: exists
+                  ? s.assessments.map((a) =>
+                      a.nodeId === ev.assessment.nodeId ? ev.assessment : a,
+                    )
+                  : [...s.assessments, ev.assessment],
+              };
+            });
+          }
           break;
         case "finished":
-          set({ assessments: ev.assessments, status: "done" });
+          set({
+            assessments: Array.isArray(ev.assessments) ? ev.assessments : [],
+            status: "done",
+          });
           break;
       }
     });

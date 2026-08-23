@@ -13,6 +13,8 @@ export interface EngineApi {
   restart(): Promise<void>;
   quit(): Promise<void>;
   subscribe(cb: (ev: EngineEvent) => void): () => void;
+  /** 扫描常见目录中的 Pikafish 可执行文件（供引擎选择）。 */
+  discover(): Promise<string[]>;
 }
 
 export const tauriEngineApi: EngineApi = {
@@ -24,6 +26,7 @@ export const tauriEngineApi: EngineApi = {
   stop: () => invokeCommand<void>("engine_stop"),
   restart: () => invokeCommand<void>("engine_restart"),
   quit: () => invokeCommand<void>("engine_quit"),
+  discover: () => invokeCommand<string[]>("engine_discover_binaries"),
   subscribe: (cb) => {
     let unlisten: (() => void) | null = null;
     void listenEvent<EngineEventDto>("engine://event", (payload) =>
@@ -48,6 +51,7 @@ export const memoryEngineApi: EngineApi = {
   stop: async () => undefined,
   restart: async () => undefined,
   quit: async () => undefined,
+  discover: async () => [],
   subscribe: () => () => undefined,
 };
 

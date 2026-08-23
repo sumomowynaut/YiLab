@@ -46,6 +46,7 @@ function makeBoardApi(): BoardApi {
     legalMoves: vi.fn(async () => []),
     makeMove: vi.fn(async () => undefined as never),
     applyMoves: vi.fn(async () => undefined as never),
+    movesToChinese: vi.fn(async () => []),
     validate: vi.fn(async () => undefined as never),
     rotate: vi.fn(async () => undefined as never),
     setPiece: vi.fn(async () => undefined as never),
@@ -107,17 +108,19 @@ describe("useEngineStore", () => {
     expect(useEngineStore.getState().lines[1]?.pv).not.toContain("b0c2");
   });
 
-  it("applies settings and uses depth in analysis params", async () => {
+  it("applies settings and uses infinite live analysis", async () => {
     const api = makeEngineApi();
     useEngineStore.getState().init(api, makeBoardApi());
+    await useEngineStore.getState().start();
     await useEngineStore.getState().applySettings({ threads: 4, hash: 64, multipv: 3, depth: 10 });
     expect(api.setOption).toHaveBeenCalledWith("Threads", "4");
     expect(api.setOption).toHaveBeenCalledWith("Hash", "64");
     expect(api.setOption).toHaveBeenCalledWith("MultiPV", "3");
     await useEngineStore.getState().startAnalysis("fen");
+    // 实时分析始终持续，避免有穷深度导致页面反复刷新
     expect(api.setPositionAndGo).toHaveBeenCalledWith("fen", [], {
-      infinite: false,
-      depth: 10,
+      infinite: true,
+      depth: null,
       movetimeMs: null,
       nodes: null,
     });
@@ -169,8 +172,8 @@ describe("useEngineStore", () => {
     useEngineStore.getState().init(makeEngineApi(), makeBoardApi());
     expect(useEngineStore.getState().settings).toEqual({
       programPath: "",
-      threads: 1,
-      hash: 16,
+      threads: 4,
+      hash: 128,
       depth: null,
       multipv: 1,
     });

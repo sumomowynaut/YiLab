@@ -8,7 +8,7 @@ use image::{Rgb, Rgba, RgbaImage};
 
 use crate::board::types::{Color, Piece, Position, NUM_FILES, NUM_RANKS};
 
-use super::font::draw_char;
+use super::glyphs::{self, Glyph};
 use super::BoardOrientation;
 
 /// 棋盘底色（浅木色）。
@@ -72,17 +72,48 @@ pub fn draw_piece(img: &mut RgbaImage, cx: f32, cy: f32, radius: f32, piece: Pie
             }
         }
     }
-    // 盘面字母（放大到盘径的 ~55% 高）
-    // font only has uppercase glyphs; black FEN chars are lowercase -> uppercase
-    let letter = piece.kind.fen_char(piece.color).to_ascii_uppercase();
-    let scale = ((radius * 2.0 * 0.55) / 7.0).round().max(1.0) as usize;
-    let lw = 5 * scale;
-    let lh = 7 * scale;
-    let ox = (cx - lw as f32 / 2.0).round() as usize;
-    let oy = (cy - lh as f32 / 2.0).round() as usize;
-    let stride = img.width() as usize * 4;
-    let raw = img.as_mut();
-    draw_char(raw, stride, 4, ox, oy, scale, letter, PIECE_TEXT.0);
+    // 盘面汉字（字形模板与识别器共享，保证自洽）
+    let glyph = glyphs::first_glyph(piece.color, piece.kind);
+    draw_glyph(img, glyph, cx, cy, radius * 1.1, PIECE_TEXT.0);
+}
+
+/// 在 RGBA 画布上以左下角/中心缩放绘制一个 20 点阵字形（圆心居中）。
+fn draw_glyph(
+    img: &mut RgbaImage,
+    glyph: &Glyph,
+    cx: f32,
+    cy: f32,
+    half_size: f32,
+    color: [u8; 3],
+) {
+    let grid = glyphs::GLYPH_GRID as f32;
+    // 字形占棋子直径约 60%，故半宽取 half_size 的 0.6 倍
+    let side = half_size * 1.2f32;
+    let scale = (side / grid).max(1.0);
+    let x0 = (cx - side / 2.0).round() as i32;
+    let y0 = (cy - side / 2.0).round() as i32;
+    let w = img.width() as i32;
+    let h = img.height() as i32;
+    for gy in 0..glyphs::GLYPH_GRID {
+        for gx in 0..glyphs::GLYPH_GRID {
+            if !glyph.get(gx, gy) {
+                continue;
+            }
+            for sy in 0..(scale as i32) {
+                for sx in 0..(scale as i32) {
+                    let px = x0 + gx as i32 * scale as i32 + sx;
+                    let py = y0 + gy as i32 * scale as i32 + sy;
+                    if px >= 0 && py >= 0 && px < w && py < h {
+                        img.put_pixel(
+                            px as u32,
+                            py as u32,
+                            Rgba([color[0], color[1], color[2], 255]),
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// 用 `orientation` 把 (rank, file) 映射到图像坐标（像素，格中心）。

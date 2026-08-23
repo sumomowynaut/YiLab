@@ -29,3 +29,8 @@ dist-ssr
 
 # Tauri / Rust
 src-tauri/target/
+# 本地 OCR 训练/验证截图（不发布到公开仓库）
+ocr-dataset/
+
+# 本地构建产物（免安装 exe 等）
+release/

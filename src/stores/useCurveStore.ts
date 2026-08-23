@@ -6,10 +6,17 @@ import type { CurvePoint } from "../lib/engine/curve";
 
 export type { CurvePoint } from "../lib/engine/curve";
 
+export interface CurveMeta {
+  /** 走到该局面的着法（如 炮二平五）。 */
+  moveLabel?: string;
+  /** 展示用回合信息（如 第 10 回合 · 红）。 */
+  turnLabel?: string;
+}
+
 interface CurveState {
   points: CurvePoint[];
   /** 记录或更新某局面的分数（保持首次出现的顺序）。 */
-  record: (fen: string, scoreCp: number) => void;
+  record: (fen: string, scoreCp: number, meta?: CurveMeta) => void;
   /** 清空曲线。 */
   clear: () => void;
   /** 整体替换（测试/导入用）。 */
@@ -19,15 +26,16 @@ interface CurveState {
 export const useCurveStore = create<CurveState>((set) => ({
   points: [],
 
-  record: (fen, scoreCp) =>
+  record: (fen, scoreCp, meta) =>
     set((state) => {
+      const point: CurvePoint = { fen, scoreCp, ...meta };
       const index = state.points.findIndex((p) => p.fen === fen);
       if (index >= 0) {
         const points = [...state.points];
-        points[index] = { fen, scoreCp };
+        points[index] = { ...points[index], scoreCp, ...meta };
         return { points };
       }
-      return { points: [...state.points, { fen, scoreCp }] };
+      return { points: [...state.points, point] };
     }),
 
   clear: () => set({ points: [] }),

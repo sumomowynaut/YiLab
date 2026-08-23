@@ -270,7 +270,7 @@ async fn spawn_process(
     }
     cmd.stdin(std::process::Stdio::piped());
     cmd.stdout(std::process::Stdio::piped());
-    cmd.stderr(std::process::Stdio::null());
+    cmd.stderr(std::process::Stdio::piped());
     // 任务结束/句柄丢弃时自动终止进程（兜底）
     cmd.kill_on_drop(true);
 
@@ -283,26 +283,73 @@ async fn spawn_process(
         .stdout
         .take()
         .ok_or_else(|| "引擎 stdout 不可用".to_string())?;
+    let mut stderr = child.stderr.take();
     let mut reader = BufReader::new(stdout);
 
-    let (id, options) = handshake(&mut stdin, &mut reader, config.handshake_timeout).await?;
+    let (id, options) = match handshake(&mut stdin, &mut reader, config.handshake_timeout).await {
+        Ok(x) => x,
+        Err(e) => {
+            // 读取引擎 stderr 以获得更具体的原因（如缺 NNUE、指令集不支持等）。
+            if let Some(mut err) = stderr.take() {
+                use tokio::io::AsyncReadExt;
+                let mut msg = String::new();
+                let _ = timeout(
+                    std::time::Duration::from_millis(500),
+                    err.read_to_string(&mut msg),
+                )
+                .await;
+                let msg = msg.trim();
+                if !msg.is_empty() {
+                    return Err(format!("{e}：{msg}"));
+                }
+            }
+            return Err(e);
+        }
+    };
     Ok((child, stdin, reader, id, options))
 }
 
-/// 依据引擎可执行文件路径，自动发现同目录或上一级目录中的 `pikafish.nnue`。
+/// 在目录中查找 NNUE 权重：优先 `pikafish.nnue`，其次任意 `*.nnue`。
+fn find_nnue_in(dir: &Path) -> Option<PathBuf> {
+    let preferred = dir.join("pikafish.nnue");
+    if preferred.is_file() {
+        return Some(preferred);
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return None;
+    };
+    for entry in entries.flatten() {
+        let p = entry.path();
+        if p.is_file()
+            && p.file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_ascii_lowercase().ends_with(".nnue"))
+                .unwrap_or(false)
+        {
+            return Some(p);
+        }
+    }
+    None
+}
+
+/// 依据引擎可执行文件路径，自动发现同目录或上一级目录中的 NNUE 权重。
 ///
-/// 覆盖两种常见布局：
-/// - 用户把权重与引擎放在同一目录（`exe/pikafish.nnue`）；
-/// - 官方发布包布局（`root/pikafish.nnue` + `root/Windows/pikafish-*.exe`）。
+/// 覆盖常见布局：
+/// - 用户把权重与引擎放在同一目录；
+/// - 官方发布包布局（`root/*.nnue` + `root/Windows/pikafish-*.exe`）。
 ///
 /// 仅做「文件存在性」探测，返回绝对路径；找不到返回 None（交给引擎自行处理并报错）。
 pub fn discover_eval_file(program: &Path) -> Option<PathBuf> {
     let exe_dir = program.parent()?;
-    let candidates = [
-        exe_dir.join("pikafish.nnue"),
-        exe_dir.parent()?.join("pikafish.nnue"),
-    ];
-    candidates.into_iter().find(|p| p.is_file())
+    if let Some(p) = find_nnue_in(exe_dir) {
+        return Some(p);
+    }
+    if let Some(parent) = exe_dir.parent() {
+        if let Some(p) = find_nnue_in(parent) {
+            return Some(p);
+        }
+    }
+    None
 }
 
 /// uci → uciok（收集 id/option），isready → readyok。任何超时/EOF 视为启动失败。

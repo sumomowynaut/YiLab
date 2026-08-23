@@ -52,8 +52,9 @@ beforeEach(() => {
   gameApi = {
     newGame: vi.fn(async () => makeSnapshot()),
     snapshot: vi.fn(async () => makeSnapshot()),
-    save: vi.fn(async () => undefined),
+    save: vi.fn(async () => "/mock/弈研棋谱.json"),
     load: vi.fn(async () => makeSnapshot({ currentId: 5 })),
+    openSaveDir: vi.fn(async () => undefined),
     insertMove: vi.fn(async () => makeSnapshot()),
     navigate: vi.fn(async () => makeSnapshot({ currentId: 5 })),
     previous: vi.fn(async () => makeSnapshot()),
@@ -81,6 +82,7 @@ beforeEach(() => {
     legalMoves: vi.fn(async () => ["h2e2"]),
     makeMove: vi.fn(async () => parseFen(START_FEN)),
     applyMoves: vi.fn(async () => parseFen(START_FEN)),
+    movesToChinese: vi.fn(async () => []),
     validate: vi.fn(async () => ({ ok: true, issues: [] })),
     rotate: vi.fn(async () => parseFen(START_FEN)),
     setPiece: vi.fn(async () => ({
@@ -158,7 +160,7 @@ describe("useGameStore", () => {
     await useGameStore.getState().init(gameApi, boardApi);
     await useGameStore.getState().saveGame();
     expect(gameApi.save).toHaveBeenCalledTimes(1);
-    expect(useGameStore.getState().message).toBe("已保存当前棋局");
+    expect(useGameStore.getState().message).toContain("已保存：");
 
     await useGameStore.getState().loadGame();
     expect(gameApi.load).toHaveBeenCalledTimes(1);

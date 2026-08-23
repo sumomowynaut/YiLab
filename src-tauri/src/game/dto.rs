@@ -14,6 +14,8 @@ pub struct TreeNodeDto {
     pub id: u64,
     /// 本节点着法（UCI），根节点为 None。
     pub mv: Option<String>,
+    /// 本节点着法的中文纵线制记谱（如 炮二平五），根节点为空字符串。
+    pub chinese_mv: String,
     /// 显示回合数（红方着法 N.，黑方着法 N…）。
     pub move_number: u32,
     pub is_red: bool,
@@ -85,9 +87,23 @@ fn build_node(tree: &GameTree, id: NodeId) -> Result<TreeNodeDto, String> {
         .iter()
         .map(|c| build_node(tree, *c))
         .collect::<Result<Vec<_>, _>>()?;
+    let chinese_mv = match n.mv {
+        Some(mv) => {
+            let before_fen = match n.parent.and_then(|p| tree.node(p).ok()) {
+                Some(p) => p.fen.clone(),
+                None => tree.startpos.clone(),
+            };
+            parse_fen(&before_fen)
+                .ok()
+                .map(|pos| crate::board::chinese::move_to_chinese(&pos, &mv))
+                .unwrap_or_else(|| mv.uci())
+        }
+        None => String::new(),
+    };
     Ok(TreeNodeDto {
         id,
         mv: n.mv.map(|m| m.uci()),
+        chinese_mv,
         move_number,
         is_red,
         comment: n.comment.clone(),

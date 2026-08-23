@@ -20,6 +20,10 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
+use crate::board::chinese::move_to_chinese;
+use crate::board::fen::parse_fen;
+use crate::board::rules::apply_move;
+use crate::board::types::{Move, Position};
 use crate::engine::{EngineEvent, EngineManager, GoParams, InfoLine, Score};
 
 /// 着法评价分类。
@@ -145,8 +149,12 @@ pub struct MoveAssessment {
     pub node_id: u64,
     /// 实际着法（UCI）。
     pub mv: String,
+    /// 实际着法（中文纵线制）。
+    pub mv_cn: String,
     /// 最佳着法（UCI）。
     pub best_move: String,
+    /// 最佳着法（中文纵线制）。
+    pub best_move_cn: String,
     /// 走前评价（红方视角，厘兵）。
     pub eval_before_cp: i32,
     /// 走后评价（红方视角，厘兵）。
@@ -155,6 +163,8 @@ pub struct MoveAssessment {
     pub loss_cp: i32,
     pub depth: u32,
     pub pv: Vec<String>,
+    /// PV（中文纵线制）。
+    pub pv_cn: Vec<String>,
     pub category: Category,
 }
 
@@ -207,8 +217,12 @@ pub enum AnalysisEvent {
         total: usize,
         current_node: Option<u64>,
     },
-    Assessment(MoveAssessment),
-    Finished(Vec<MoveAssessment>),
+    Assessment {
+        assessment: MoveAssessment,
+    },
+    Finished {
+        assessments: Vec<MoveAssessment>,
+    },
 }
 
 /// 分析器内部状态（std Mutex：访问都是短临界区，不跨 await 持锁）。
@@ -412,7 +426,7 @@ async fn runner_loop(
             let _ = events.send(AnalysisEvent::StatusChanged {
                 status: AnalysisStatus::Done,
             });
-            let _ = events.send(AnalysisEvent::Finished(assessments));
+            let _ = events.send(AnalysisEvent::Finished { assessments });
             notify.notified().await;
             continue;
         }
@@ -426,7 +440,9 @@ async fn runner_loop(
                     // 用 位置 start_i-1（prev）与 位置 start_i（outcome）构建第 start_i-1 步评估
                     if let Some(before) = prev.as_ref() {
                         let plan = &moves[start_i - 1];
-                        let assessment = build_assessment(plan, before, &outcome, &config);
+                        let pos_before = position_before(&startpos, &moves, start_i - 1);
+                        let assessment =
+                            build_assessment(plan, before, &outcome, &config, &pos_before);
                         {
                             let mut s = state.lock().unwrap_or_else(|e| e.into_inner());
                             s.assessments.push(assessment.clone());
@@ -434,7 +450,7 @@ async fn runner_loop(
                             s.current_node = Some(plan.node_id);
                             s.last_outcome = Some(outcome.clone());
                         }
-                        let _ = events.send(AnalysisEvent::Assessment(assessment));
+                        let _ = events.send(AnalysisEvent::Assessment { assessment });
                         let _ = events.send(AnalysisEvent::Progress {
                             done: start_i,
                             total: moves.len(),
@@ -512,12 +528,47 @@ async fn analyze_one(
     })
 }
 
+/// 从起始局面重放前 `n` 步，得到「第 n 步走子前」的局面（失败回退空棋盘，记谱退化为 UCI）。
+fn position_before(startpos: &str, moves: &[PlannedMove], n: usize) -> Position {
+    let mut pos = parse_fen(startpos).unwrap_or_default();
+    for m in moves.iter().take(n) {
+        if let Some(mv) = Move::parse_uci(&m.mv) {
+            if let Some(next) = apply_move(&pos, mv) {
+                pos = next;
+            }
+        }
+    }
+    pos
+}
+
+fn one_to_chinese(pos: &Position, uci: &str) -> String {
+    match Move::parse_uci(uci) {
+        Some(mv) => move_to_chinese(pos, &mv),
+        None => uci.to_string(),
+    }
+}
+
+fn pv_to_chinese(pos: &Position, pv: &[String]) -> Vec<String> {
+    let mut cur = pos.clone();
+    let mut out = Vec::new();
+    for uci in pv {
+        out.push(one_to_chinese(&cur, uci));
+        if let Some(mv) = Move::parse_uci(uci) {
+            if let Some(next) = apply_move(&cur, mv) {
+                cur = next;
+            }
+        }
+    }
+    out
+}
+
 /// 构建第 `plan` 步的评估。
 fn build_assessment(
     plan: &PlannedMove,
     before: &SearchOutcome,
     after: &SearchOutcome,
     config: &AnalysisConfig,
+    pos_before: &Position,
 ) -> MoveAssessment {
     // 损失 = 走子方视角：红方 loss = before - after；黑方 loss = after - before
     let loss = if plan.is_red {
@@ -530,12 +581,15 @@ fn build_assessment(
     MoveAssessment {
         node_id: plan.node_id,
         mv: plan.mv.clone(),
+        mv_cn: one_to_chinese(pos_before, &plan.mv),
         best_move: before.best_move.clone(),
+        best_move_cn: one_to_chinese(pos_before, &before.best_move),
         eval_before_cp: before.score_cp_red,
         eval_after_cp: after.score_cp_red,
         loss_cp: loss,
         depth: before.depth,
         pv: before.pv.clone(),
+        pv_cn: pv_to_chinese(pos_before, &before.pv),
         category,
     }
 }
@@ -606,7 +660,8 @@ mod tests {
             depth: 12,
             pv: vec!["h7e7".into()],
         };
-        let a = build_assessment(&red, &before, &after, &AnalysisConfig::default());
+        let pos = Position::default();
+        let a = build_assessment(&red, &before, &after, &AnalysisConfig::default(), &pos);
         assert_eq!(a.loss_cp, 80);
         assert_eq!(a.category, Category::Inaccuracy);
         assert_eq!(a.eval_before_cp, 50);
@@ -620,7 +675,7 @@ mod tests {
             mv: "h7e7".into(),
             is_red: false,
         };
-        let b = build_assessment(&black, &before, &after, &AnalysisConfig::default());
+        let b = build_assessment(&black, &before, &after, &AnalysisConfig::default(), &pos);
         assert_eq!(b.loss_cp, 0);
         assert_eq!(b.category, Category::Best);
         // 红方视角下黑方收益为正（after > before）→ 黑方损失为正
@@ -636,7 +691,7 @@ mod tests {
             depth: 10,
             pv: vec![],
         };
-        let b2 = build_assessment(&black, &before2, &after2, &AnalysisConfig::default());
+        let b2 = build_assessment(&black, &before2, &after2, &AnalysisConfig::default(), &pos);
         assert_eq!(b2.loss_cp, 80);
         assert_eq!(b2.category, Category::Inaccuracy);
         // 黑方赚分（红方视角下降）→ 黑方损失为 0
@@ -652,7 +707,7 @@ mod tests {
             depth: 10,
             pv: vec![],
         };
-        let b3 = build_assessment(&black, &before3, &after3, &AnalysisConfig::default());
+        let b3 = build_assessment(&black, &before3, &after3, &AnalysisConfig::default(), &pos);
         assert_eq!(b3.loss_cp, 0);
         assert_eq!(b3.category, Category::Best);
     }

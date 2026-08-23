@@ -23,7 +23,7 @@ beforeEach(() => {
 describe("App", () => {
   it("renders the board with the start position and empty move tree", async () => {
     render(<App />);
-    expect(await screen.findByText("PikaXiangqi")).toBeInTheDocument();
+    expect(await screen.findByText("弈研 YiLab")).toBeInTheDocument();
     expect(screen.getByText("帅")).toBeInTheDocument();
     expect(screen.getByText("红方")).toBeInTheDocument();
     expect(screen.getByTestId("move-tree-empty")).toBeInTheDocument();
@@ -56,9 +56,6 @@ describe("App", () => {
 
     fireEvent.click(screen.getByTestId("tab-analysis"));
     expect(screen.getByTestId("analysis-panel")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("tab-book"));
-    expect(screen.getByTestId("book-panel")).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("tab-io"));
     expect(screen.getByTestId("game-codec")).toBeInTheDocument();

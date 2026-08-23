@@ -21,7 +21,7 @@ function readFileBytes(file: File): Promise<Uint8Array> {
   });
 }
 
-/** 截图识别面板：选择图片 → 识别 → 展示置信度/问题 → 载入人工修正。 */
+/** 截图识别面板：本地识别 → 展示置信度/问题 → 载入人工修正。 */
 export function OcrPanel({ ocrApi, onLoaded }: OcrPanelProps) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<OcrResultDto | null>(null);
@@ -29,9 +29,7 @@ export function OcrPanel({ ocrApi, onLoaded }: OcrPanelProps) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleFile(file: File | null) {
-    if (!file) {
-      return;
-    }
+    if (!file) return;
     setBusy(true);
     setError(null);
     setResult(null);
@@ -50,25 +48,28 @@ export function OcrPanel({ ocrApi, onLoaded }: OcrPanelProps) {
 
   return (
     <div data-testid="ocr-panel" className="flex flex-col gap-3 rounded border p-3">
-      <div className="text-sm font-semibold">截图识别</div>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/png,image/jpeg"
-        data-testid="ocr-file"
-        className="hidden"
-        onChange={(event) => void handleFile(event.currentTarget.files?.[0] ?? null)}
-      />
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        data-testid="ocr-pick"
-        disabled={busy}
-        onClick={() => fileRef.current?.click()}
-      >
-        {busy ? "识别中…" : "选择截图…"}
-      </Button>
+      <div className="text-sm font-semibold">截图识别（本地）</div>
+
+      <div className="flex flex-wrap gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg"
+          data-testid="ocr-file"
+          className="hidden"
+          onChange={(event) => void handleFile(event.currentTarget.files?.[0] ?? null)}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="ocr-pick"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+        >
+          {busy ? "识别中…" : "选择截图并识别…"}
+        </Button>
+      </div>
 
       {error && (
         <p data-testid="ocr-error" className="text-xs text-red-500">
@@ -85,7 +86,7 @@ export function OcrPanel({ ocrApi, onLoaded }: OcrPanelProps) {
             {result.valid ? " · ✅ 通过规则校验" : " · ⚠️ 存在问题"}
           </p>
           {uncertainCount > 0 && (
-            <p className="text-amber-600">有 {uncertainCount} 格识别不确定，请手动摆棋修正。</p>
+            <p className="text-amber-600">有 {uncertainCount} 格识别不确定，请在棋盘上核对修正。</p>
           )}
           {result.issues.length > 0 && (
             <ul data-testid="ocr-issues" className="list-inside list-disc text-amber-600">

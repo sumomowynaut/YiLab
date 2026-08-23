@@ -38,7 +38,7 @@ function MoveChip({
           {node.isRed ? "." : "…"}
         </span>
       )}
-      <span className="font-mono">{node.mv}</span>
+      <span className="font-mono">{node.chineseMv || node.mv}</span>
       {node.nags.length > 0 && (
         <span className="font-bold text-amber-500">{node.nags.join("")}</span>
       )}
