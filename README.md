@@ -1,23 +1,37 @@
-# PikaXiangqi
+# 弈研 YiLab（PikaXiangqi）
 
 现代化、开源、本地优先的 **Windows 桌面中国象棋复盘与 AI 分析软件**。
 
-- 技术栈：Tauri 2 · React · TypeScript · Rust · SQLite · Zustand · Tailwind CSS · shadcn/ui
-- 引擎：本地 Pikafish（UCI 象棋引擎）
-- 文档：`docs/` 目录（产品规格、架构、数据模型、引擎、导入导出、开局库、OCR、测试、许可、开发计划、功能矩阵）
+## 功能
 
-## 当前状态
+- 完整中国象棋棋盘、合法走棋、FEN 导入导出
+- 棋谱树：主线 / 变例 / 多层分支 / 注释 / NAG / 悔棋重做
+- 本地 Pikafish 引擎分析（UCI）：MultiPV、线程/哈希/深度设置、持续分析
+- 评价曲线（悬停查看每步着法与评分）
+- 自动复盘：逐手评估、Best/Excellent/Good/Inaccuracy/Mistake/Blunder 分类
+- PGN / FEN 导入导出
+- 截图识别（本地，离线可用）
+- GIF 导出（当前局面 / 主线 / 变例）
+- 深浅色模式、快捷键
+- Windows 安装版与免安装版
 
-Phase 0 项目骨架（可运行的空窗口 + CI）。详见 `STATUS.md`。
+## 技术栈
+
+Tauri 2 · React · TypeScript · Rust · SQLite · Zustand · Tailwind CSS · shadcn/ui
+
+引擎：本地 [Pikafish](https://github.com/official-pikafish/Pikafish)（UCI 象棋引擎），需要你自己准备引擎程序路径。
+
+## 文档
+
+`docs/` 目录：产品规格、架构、数据模型、引擎、导入导出、开局库、OCR、测试、许可、开发计划、功能矩阵。
 
 ## 开发
 
-前置要求：Node.js ≥ 20、Rust（Windows 建议 MSVC toolchain）。
+前置要求：Node.js ≥ 20、Rust。
 
 ```bash
 npm install
-npm run dev        # 浏览器/tauri dev 前端的 Vite 开发服务器
-npm run tauri dev  # 以桌面应用方式运行
+npm run tauri dev   # 以桌面应用方式运行
 ```
 
 ## 常用命令
@@ -27,19 +41,25 @@ npm run build        # 前端构建（tsc + vite build）
 npm run test         # Vitest 单元测试
 npm run lint         # ESLint
 npm run format       # Prettier 格式化
-npm run format:check # Prettier 检查
 
-cargo test                            # Rust 测试
-cargo check --manifest-path src-tauri/Cargo.toml
+cargo test                               # Rust 测试
 cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 ```
 
-## CI / 发布
+## 打包 Windows 版
 
-- `.github/workflows/ci.yml`：push/PR 全量检查（Windows）。
-- GitHub Release 流水线在 Phase 6 落地（见 `docs/development-plan.md`）。
+```bash
+npm run tauri build        # 生成安装版（联网时会自动下载 NSIS/WiX）
+npm run tauri build -- --no-bundle   # 仅生成免安装 exe
+```
+
+免安装版运行时需要把 `WebView2Loader.dll` 放在 exe 同目录。
+
+## CI
+
+`.github/workflows/ci.yml`：push / PR 时在 Windows 上运行全量检查。
 
 ## 许可
 
-引擎与 NNUE 权重存在独立的许可约束，发布前必须完成决策，详见 `docs/licensing.md`（非法律意见）。
+引擎（Pikafish）与 NNUE 权重存在独立的许可约束；本软件不内置引擎二进制，引擎由用户自行提供。发布/分发前请阅读 `docs/licensing.md`（非法律意见）。

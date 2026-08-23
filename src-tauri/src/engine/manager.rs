@@ -4,6 +4,8 @@
 //! - 单任务事件循环：stdout 逐行异步解析，命令经 mpsc 串行化，避免并发写 stdin。
 //! - 处理：启动失败、崩溃（stdout EOF）、停止超时、restart、quit、分析期间切换局面。
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -240,9 +242,19 @@ impl Drop for EngineManager {
                 Err(_) => None,
             };
             if let Some(pid) = pid {
-                let _ = std::process::Command::new("taskkill")
-                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                    .status();
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = std::process::Command::new("taskkill")
+                        .args(["/F", "/T", "/PID", &pid.to_string()])
+                        .creation_flags(0x0800_0000)
+                        .status();
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    let _ = std::process::Command::new("taskkill")
+                        .args(["/F", "/T", "/PID", &pid.to_string()])
+                        .status();
+                }
             }
         }
         #[cfg(not(target_os = "windows"))]
@@ -273,6 +285,12 @@ async fn spawn_process(
     cmd.stderr(std::process::Stdio::piped());
     // 任务结束/句柄丢弃时自动终止进程（兜底）
     cmd.kill_on_drop(true);
+
+    // Windows 下禁止引擎创建控制台窗口（否则会弹出黑窗口，用户关掉它等于杀掉引擎）
+    #[cfg(target_os = "windows")]
+    {
+        cmd.creation_flags(0x0800_0000);
+    }
 
     let mut child = cmd.spawn().map_err(|e| format!("启动引擎失败：{e}"))?;
     let mut stdin = child
