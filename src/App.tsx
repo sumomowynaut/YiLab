@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { Board } from "./components/board/Board";
 import { MoveTree } from "./components/board/MoveTree";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./com
 import { AnalysisPanel } from "./components/engine/AnalysisPanel";
 import { EvalCurve } from "./components/engine/EvalCurve";
 import { AnalysisReport } from "./components/analysis/AnalysisReport";
+import { GifExportPanel } from "./components/gif/GifExportPanel";
 import { GameCodec } from "./components/io/GameCodec";
 import { OcrPanel } from "./components/ocr/OcrPanel";
 import { getDefaultBoardApi } from "./lib/board/api";
@@ -17,11 +18,14 @@ import { getDefaultGameApi } from "./lib/game/api";
 import { getDefaultIoApi } from "./lib/io/api";
 import { getDefaultOcrApi } from "./lib/ocr/api";
 import { getDefaultAnalysisApi } from "./lib/analysis/api";
+import { getDefaultGifApi } from "./lib/gif/api";
 import { useEngineStore } from "./stores/useEngineStore";
 import { useThemeStore } from "./stores/useThemeStore";
 import { useCurveStore } from "./stores/useCurveStore";
 import { useAnalysisStore } from "./stores/useAnalysisStore";
 import { selectDisplayPosition, useGameStore } from "./stores/useGameStore";
+import type { VariationOption } from "./lib/gif/types";
+import type { TreeNodeDto } from "./lib/game/types";
 
 function App() {
   const snapshot = useGameStore((state) => state.snapshot);
@@ -57,6 +61,26 @@ function App() {
   const setNag = useGameStore((state) => state.setNag);
   const toggleVariation = useGameStore((state) => state.toggleVariation);
   const adoptSnapshot = useGameStore((state) => state.adoptSnapshot);
+
+  // 收集变例节点（GIF「指定变例」来源）
+  const variations = useMemo(() => {
+    const out: VariationOption[] = [];
+    function walk(node: TreeNodeDto): void {
+      if (node.isVariation) {
+        out.push({
+          nodeId: node.id,
+          label: `${node.moveNumber}${node.isRed ? "." : "…"} ${node.mv ?? ""}`,
+        });
+      }
+      for (const child of node.children) {
+        walk(child);
+      }
+    }
+    if (snapshot) {
+      walk(snapshot.tree);
+    }
+    return out;
+  }, [snapshot]);
   const theme = useThemeStore((state) => state.theme);
   const initTheme = useThemeStore((state) => state.initTheme);
   const toggleTheme = useThemeStore((state) => state.toggleTheme);
@@ -91,6 +115,7 @@ function App() {
   const [commentDraft, setCommentDraft] = useState("");
   const [ioApi] = useState(() => getDefaultIoApi());
   const [ocrApi] = useState(() => getDefaultOcrApi());
+  const [gifApi] = useState(() => getDefaultGifApi());
 
   useEffect(() => {
     void init(getDefaultGameApi(), getDefaultBoardApi());
@@ -334,6 +359,8 @@ function App() {
             />
 
             <EvalCurve points={curvePoints} onClear={curveClear} />
+
+            <GifExportPanel gifApi={gifApi} variations={variations} />
 
             <AnalysisReport
               status={analysisStatus}

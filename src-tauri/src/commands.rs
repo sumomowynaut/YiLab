@@ -13,7 +13,7 @@ use crate::book::{dto::BookMoveDto, local::LocalBookProvider, BookChain, BookMov
 use crate::game::{
     dto::{snapshot as game_snapshot_dto, GameSnapshot},
     nag::Nag,
-    tree::GameTree,
+    tree::{GameTree, NodeId},
 };
 use crate::ocr::dto::OcrResultDto;
 use std::sync::{Mutex, OnceLock};
@@ -682,4 +682,185 @@ pub async fn analysis_continue() -> Result<AnalysisStatusDto, String> {
 #[tauri::command]
 pub fn analysis_status() -> Result<AnalysisStatusDto, String> {
     Ok(analysis_dto())
+}
+
+// ===================== GIF 导出命令 =====================
+
+/// 构建 GIF 请求参数（树 → startpos + moves）。
+fn gif_request(
+    tree: &GameTree,
+    moves: Vec<String>,
+    frame_delay_ms: u64,
+    cell_size: u32,
+    show_coordinates: bool,
+    show_moves: bool,
+) -> crate::gif_export::GifRequest {
+    crate::gif_export::GifRequest {
+        startpos: tree.startpos.clone(),
+        moves,
+        frame_delay_ms,
+        cell_size,
+        show_coordinates,
+        show_moves,
+    }
+}
+
+/// 主线着法（根 → children[0] 链）。
+fn mainline_moves(tree: &GameTree) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = Some(tree.root);
+    while let Some(id) = cur {
+        let first = tree.node(id).ok().and_then(|n| n.children.first().copied());
+        match first {
+            Some(child) => {
+                if let Some(mv) = tree.node(child).ok().and_then(|n| n.mv) {
+                    out.push(mv.uci());
+                }
+                cur = Some(child);
+            }
+            None => break,
+        }
+    }
+    out
+}
+
+/// 从根到某节点的着法（到达该节点的路径）。
+fn path_to(tree: &GameTree, node: NodeId) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    let mut cur = Some(node);
+    while let Some(id) = cur {
+        let n = tree.node(id).map_err(game_err)?;
+        if let Some(mv) = n.mv {
+            out.push(mv.uci());
+        }
+        cur = n.parent;
+    }
+    out.reverse();
+    Ok(out)
+}
+
+/// 从某节点出发沿其主线续着（含节点自身着法）。
+fn line_from(tree: &GameTree, node: NodeId) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    let mut cur = Some(node);
+    while let Some(id) = cur {
+        let n = tree.node(id).map_err(game_err)?;
+        if let Some(mv) = n.mv {
+            out.push(mv.uci());
+        }
+        cur = n.children.first().copied();
+    }
+    Ok(out)
+}
+
+/// 导出「当前局面」GIF（单帧）。
+#[tauri::command]
+pub fn gif_export_current(
+    frame_delay_ms: u64,
+    cell_size: u32,
+    show_coordinates: bool,
+    show_moves: bool,
+) -> Result<Vec<u8>, String> {
+    let tree = game_tree().lock().map_err(game_err)?;
+    let req = crate::gif_export::GifRequest {
+        startpos: tree.current_node().fen.clone(),
+        moves: Vec::new(),
+        frame_delay_ms,
+        cell_size,
+        show_coordinates,
+        show_moves,
+    };
+    crate::gif_export::export_gif(&req)
+}
+
+/// 导出「主线」GIF（startpos + 全部主线着法）。
+#[tauri::command]
+pub fn gif_export_mainline(
+    frame_delay_ms: u64,
+    cell_size: u32,
+    show_coordinates: bool,
+    show_moves: bool,
+) -> Result<Vec<u8>, String> {
+    let tree = game_tree().lock().map_err(game_err)?;
+    let moves = mainline_moves(&tree);
+    let req = gif_request(
+        &tree,
+        moves,
+        frame_delay_ms,
+        cell_size,
+        show_coordinates,
+        show_moves,
+    );
+    crate::gif_export::export_gif(&req)
+}
+
+/// 导出「指定变例」GIF（从根播放到分支点，再播放该变例）。
+#[tauri::command]
+pub fn gif_export_variation(
+    node_id: u64,
+    frame_delay_ms: u64,
+    cell_size: u32,
+    show_coordinates: bool,
+    show_moves: bool,
+) -> Result<Vec<u8>, String> {
+    let tree = game_tree().lock().map_err(game_err)?;
+    // 到变例起点之前（父位置）的路径 + 变例自身的着法
+    let parent = tree.node(node_id).map_err(game_err)?.parent;
+    let mut moves = match parent {
+        Some(p) => path_to(&tree, p)?,
+        None => Vec::new(),
+    };
+    moves.extend(line_from(&tree, node_id)?);
+    let req = gif_request(
+        &tree,
+        moves,
+        frame_delay_ms,
+        cell_size,
+        show_coordinates,
+        show_moves,
+    );
+    crate::gif_export::export_gif(&req)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mv(uci: &str) -> Move {
+        Move::parse_uci(uci).unwrap()
+    }
+
+    fn build_tree() -> GameTree {
+        let mut tree = GameTree::new(START_FEN).unwrap();
+        tree.insert_move(mv("h2e2")).unwrap();
+        tree.insert_move(mv("h7e7")).unwrap();
+        tree.insert_move(mv("h0g2")).unwrap();
+        // h7e7 节点下的变例（红方走 b0c2 而非 h0g2）
+        let n2 = tree.current_node().parent.unwrap();
+        tree.set_current(n2).unwrap();
+        tree.insert_move(mv("b0c2")).unwrap();
+        tree.insert_move(mv("h9g7")).unwrap();
+        tree
+    }
+
+    #[test]
+    fn mainline_moves_walks_first_children() {
+        let tree = build_tree();
+        assert_eq!(mainline_moves(&tree), vec!["h2e2", "h7e7", "h0g2"]);
+    }
+
+    #[test]
+    fn path_to_and_line_from_for_variation() {
+        let tree = build_tree();
+        // 结构：root → h2e2 → h7e7 → [h0g2(主线), b0c2(变例) → h9g7]
+        let h2e2 = tree.node(tree.root).unwrap().children[0];
+        let h7e7 = tree.node(h2e2).unwrap().children[0];
+        let var = tree.node(h7e7).unwrap().children[1];
+        assert_eq!(tree.node(var).unwrap().mv.unwrap().uci(), "b0c2");
+        // 到变例起点之前（h7e7，含其自身着法）的路径
+        let parent = tree.node(var).unwrap().parent.unwrap();
+        assert_eq!(path_to(&tree, parent).unwrap(), vec!["h2e2", "h7e7"]);
+        // 变例自身着法（b0c2 及其续着 h9g7）
+        assert_eq!(line_from(&tree, var).unwrap(), vec!["b0c2", "h9g7"]);
+    }
 }

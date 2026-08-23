@@ -5,6 +5,18 @@
 
 ## 当前阶段
 
+**GIF 导出 ✅ 完成（2026-08-23）**
+
+- ✅ `src-tauri/src/gif_export.rs`：`GifRequest`（startpos + moves + 帧间隔/棋盘尺寸/坐标/棋步）+ `export_gif` → GIF 字节。
+- ✅ 来源：**当前局面**（单帧）/ **主线**（startpos + 主线全部着法）/ **指定变例**（到分支点 + 变例着法）。
+- ✅ 支持：**帧间隔**（毫秒 → 厘秒）、**棋盘尺寸**（格子像素）、**显示坐标**（a-i / 0-9）、**显示棋步**（最后一步高亮 + 标注）。
+- ✅ 渲染复用 `ocr::render`（同一棋盘/棋子渲染），叠加坐标/高亮/标注；字库扩展数字 0-9 与小写 a-i。
+- ✅ 编码：`gif` crate + 固定调色板就近量化（无损），`Repeat::Infinite` 循环。
+- ✅ Tauri 命令：`gif_export_current` / `gif_export_mainline` / `gif_export_variation`。
+- ✅ 前端 `GifExportPanel`：来源/变例选择 + 帧间隔/尺寸/坐标/棋步 + 导出下载（Blob）。
+- ✅ 测试：Rust 单元 4（单帧/多帧/延迟取整/错误路径）+ 集成 3（主线/单帧/变例，GIF 回读校验帧数/尺寸/延迟）+ 命令层树遍历 2 + 前端 5。
+- ⚪ 棋子图形为程序生成的字母圆盘（无中文字体）；真实棋子图形渲染留待后续。
+
 **自动复盘（Automatic Game Analysis）✅ 完成（2026-08-23）**
 
 - ✅ `src-tauri/src/analysis.rs`：`AutoAnalyzer`（tokio 异步运行器，**不阻塞 UI**）+ `MoveAssessment`。
@@ -107,11 +119,11 @@
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 107 lib + 10 engine_manager + 30 game_tree + 3 analysis + 3 io_codec + 7 ocr + 10 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
+| `cargo test` | ✅ | 114 lib + 10 engine_manager + 30 game_tree + 3 analysis + 3 gif_export + 3 io_codec + 7 ocr + 10 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
-| `npm run test` | ✅ | 88 个前端用例 |
+| `npm run test` | ✅ | 93 个前端用例 |
 | `npm run lint` | ✅ | 0 error 0 warning |
 | `npm run format:check` | ✅ | |
 | `npm run build` | ✅ | tsc + vite build |
@@ -173,3 +185,4 @@
 | 2026-08-23 | Web Feature Parity（续）：#25/#26 深浅色主题、#27 可配置快捷键、#21 脱库步数、#12 引擎参数持久化、#22 评价曲线、#30 CI 对齐；每项独立提交 |
 | 2026-08-23 | 截图识别完成：OcrEngine trait + TemplateRecognizer（传统 CV 模板匹配）+ 方向判定 + 合成截图生成器；识别只识别、棋规校验在本地 Rust（validate_position）；低置信度置空标记 + 置信度/问题清单 + OcrPanel 人工校正；提交 `feat: add screenshot recognition` |
 | 2026-08-23 | 自动复盘完成：AutoAnalyzer 异步运行器（n+1 次搜索）、可配置分类阈值（Best~Blunder）、着法/最佳/评价变化/深度/PV、评价曲线点击跳转、停止/继续/重新分析、mock 引擎确定性出分；提交 `feat: add automatic game analysis` |
+| 2026-08-23 | GIF 导出完成：当前局面/主线/指定变例来源、帧间隔/棋盘尺寸/坐标/棋步选项、gif crate 编码（固定调色板）、字库扩展数字/小写字母；提交 `feat: add gif export` |

@@ -6,6 +6,7 @@ pub mod book;
 mod commands;
 pub mod engine;
 pub mod game;
+pub mod gif_export;
 pub mod io;
 pub mod ocr;
 
@@ -73,7 +74,10 @@ pub fn run() {
             commands::analysis_start,
             commands::analysis_stop,
             commands::analysis_continue,
-            commands::analysis_status
+            commands::analysis_status,
+            commands::gif_export_current,
+            commands::gif_export_mainline,
+            commands::gif_export_variation
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
