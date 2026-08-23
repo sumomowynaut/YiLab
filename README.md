@@ -1,6 +1,8 @@
 # 弈研 YiLab
 
 现代化、开源、本地优先的 **Windows 桌面中国象棋复盘与 AI 分析软件**。
+<img width="1254" height="1254" alt="image" src="https://github.com/user-attachments/assets/edc4813f-ff55-48a5-8b0d-e736317c87ef" />
+
 
 ## 功能
 
@@ -15,6 +17,11 @@
 - GIF 导出（当前局面 / 主线 / 变例）
 - 深浅色模式、快捷键
 - Windows 安装版与免安装版
+- <img width="834" height="925" alt="image" src="https://github.com/user-attachments/assets/683e6910-452b-4b65-b818-8c6ad5757364" />
+- <img width="935" height="923" alt="image" src="https://github.com/user-attachments/assets/d46d4268-dcc9-4c40-8b3c-01e86321462e" />
+<img width="897" height="868" alt="image" src="https://github.com/user-attachments/assets/08aa5f2e-baee-4b31-8ec1-ea4a2b5f7ec9" />
+
+
 
 ## 技术栈
 
