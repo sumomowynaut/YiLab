@@ -1,4 +1,4 @@
-# 弈研 YiLab（PikaXiangqi）
+# 弈研 YiLab
 
 现代化、开源、本地优先的 **Windows 桌面中国象棋复盘与 AI 分析软件**。
 
