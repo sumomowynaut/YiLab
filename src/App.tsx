@@ -8,11 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./com
 import { AnalysisPanel } from "./components/engine/AnalysisPanel";
 import { EvalCurve } from "./components/engine/EvalCurve";
 import { GameCodec } from "./components/io/GameCodec";
+import { OcrPanel } from "./components/ocr/OcrPanel";
 import { getDefaultBoardApi } from "./lib/board/api";
 import { sideToColor } from "./lib/board/notation";
 import { getDefaultEngineApi } from "./lib/engine/api";
 import { getDefaultGameApi } from "./lib/game/api";
 import { getDefaultIoApi } from "./lib/io/api";
+import { getDefaultOcrApi } from "./lib/ocr/api";
 import { useEngineStore } from "./stores/useEngineStore";
 import { useThemeStore } from "./stores/useThemeStore";
 import { useCurveStore } from "./stores/useCurveStore";
@@ -77,6 +79,7 @@ function App() {
   const [fenInput, setFenInput] = useState("");
   const [commentDraft, setCommentDraft] = useState("");
   const [ioApi] = useState(() => getDefaultIoApi());
+  const [ocrApi] = useState(() => getDefaultOcrApi());
 
   useEffect(() => {
     void init(getDefaultGameApi(), getDefaultBoardApi());
@@ -347,6 +350,8 @@ function App() {
             </div>
 
             <GameCodec ioApi={ioApi} onImported={(snap) => adoptSnapshot(snap)} />
+
+            <OcrPanel ocrApi={ocrApi} onLoaded={(fen) => void loadFen(fen)} />
 
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={rotateView}>

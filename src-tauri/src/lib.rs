@@ -6,6 +6,7 @@ mod commands;
 pub mod engine;
 pub mod game;
 pub mod io;
+pub mod ocr;
 
 /// 返回应用版本（来自 Cargo.toml）。
 #[tauri::command]
@@ -66,7 +67,8 @@ pub fn run() {
             commands::book_recommend,
             commands::book_auto_move,
             commands::io_import,
-            commands::io_export
+            commands::io_export,
+            commands::ocr_recognize
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

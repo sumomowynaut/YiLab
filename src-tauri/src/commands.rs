@@ -14,6 +14,7 @@ use crate::game::{
     nag::Nag,
     tree::GameTree,
 };
+use crate::ocr::dto::OcrResultDto;
 use std::sync::{Mutex, OnceLock};
 
 // ===================== 棋盘核心命令 =====================
@@ -519,4 +520,15 @@ pub fn io_export(format: String) -> Result<String, String> {
         crate::io::Format::from_name(&format).ok_or_else(|| format!("未知格式：{format}"))?;
     let tree = game_tree().lock().map_err(game_err)?;
     crate::io::codec(format).serialize(&tree)
+}
+
+// ===================== 截图识别（OCR）命令 =====================
+
+/// 从图片字节识别局面（视觉模型只识别；棋规校验在本地 Rust 完成）。
+#[tauri::command]
+pub fn ocr_recognize(image: Vec<u8>) -> Result<OcrResultDto, String> {
+    let input = crate::ocr::OcrInput { image };
+    let engine = crate::ocr::template::TemplateRecognizer::new();
+    let output = crate::ocr::recognize(&engine, &input).map_err(|e| e.to_string())?;
+    Ok(OcrResultDto::from(&output))
 }

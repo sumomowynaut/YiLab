@@ -5,6 +5,16 @@
 
 ## 当前阶段
 
+**截图识别（Screenshot Recognition / OCR）✅ 完成（2026-08-23）**
+
+- ✅ `src-tauri/src/ocr/`：`OcrEngine` trait（视觉模型抽象）+ `TemplateRecognizer`（传统 CV，确定性模板匹配）+ 合成截图生成器 `render`。
+- ✅ 识别能力：棋盘检测（底色包围盒）、90 格切分、棋子分类（16 类 + 空）、**方向判定**（正立 vs 旋转 180° 模板，Flipped180 = 整图真实旋转）、行棋方（静态截图不可判断 → None + 提示）。
+- ✅ 输出结构化 Position/FEN；**视觉模型只识别，棋规校验由本地 Rust 完成**（`board::validate::validate_position`）。
+- ✅ 不确定处理：低置信度格**置空并标记**（不静默接受），输出整体置信度 + `issues`（行棋方未知/不确定格/规则校验），`valid` 标志；前端 OcrPanel 展示并「载入棋谱」走人工修正（现有局面编辑器）。
+- ✅ Tauri 命令 `ocr_recognize`（`image: Vec<u8>` → DTO）。
+- ✅ 测试：Rust 单元 8 + 集成 7（起始局面正立/翻转、自定义局面、空棋盘、缺将、损坏图/无棋盘/过小图错误路径）+ 前端 4。
+- ⚪ 真实模型（ONNX 等）选型与权重许可：`NEEDS_VERIFICATION`（docs/ocr.md §3）；后台线程化/批量识别留待后续。
+
 **Web Feature Parity ✅ 已完成可确认项（2026-08-23）**
 
 逐项核对 Feature Matrix，按优先级完成全部「可确认」功能（每项独立 test/build/commit）：
@@ -83,11 +93,11 @@
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 96 lib + 10 engine_manager + 30 game_tree + 3 io_codec + 10 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
+| `cargo test` | ✅ | 104 lib + 10 engine_manager + 30 game_tree + 3 io_codec + 7 ocr + 10 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
-| `npm run test` | ✅ | 75 个前端用例 |
+| `npm run test` | ✅ | 79 个前端用例 |
 | `npm run lint` | ✅ | 0 error 0 warning |
 | `npm run format:check` | ✅ | |
 | `npm run build` | ✅ | tsc + vite build |
@@ -147,3 +157,4 @@
 | 2026-08-23 | 开局库基础完成：BookProvider/BookStats/BookStrategy/BookChain、LocalBookProvider（Zobrist 键 + 非法着法过滤 + JSON 持久化）、CloudBookProvider 设计占位（可降级）、book_lookup/recommend/auto_move 命令；提交 `feat: add opening book` |
 | 2026-08-23 | Web Feature Parity：核对已实现功能（#8 注释/#10 UCI/#11 MultiPV → Done）；实现 #13 导入导出框架（Codec trait + 嗅探 + 粘贴/文件导入 + 复制/下载导出 UI）；提交 `docs: reconcile…` 与 `feat: add import/export framework` |
 | 2026-08-23 | Web Feature Parity（续）：#25/#26 深浅色主题、#27 可配置快捷键、#21 脱库步数、#12 引擎参数持久化、#22 评价曲线、#30 CI 对齐；每项独立提交 |
+| 2026-08-23 | 截图识别完成：OcrEngine trait + TemplateRecognizer（传统 CV 模板匹配）+ 方向判定 + 合成截图生成器；识别只识别、棋规校验在本地 Rust（validate_position）；低置信度置空标记 + 置信度/问题清单 + OcrPanel 人工校正；提交 `feat: add screenshot recognition` |

@@ -8,7 +8,7 @@
 - **Phase**：0~6（见 `development-plan.md` §2）。
 - **Status**：`Not Started` / `In Progress` / `Done` / `Blocked` / `Needs Verification`。
 
-> 当前进度（2026-08-23 Web Feature Parity 阶段后）：Done 18 / In Progress 4 / Not Started 9。`NEEDS_VERIFICATION` 项见 `docs/development-plan.md`「未知项」与阶段收尾说明。
+> 当前进度（2026-08-23）：Done 19 / In Progress 4 / Not Started 8（截图识别 #18 已完成）。`NEEDS_VERIFICATION` 项见 `docs/development-plan.md`「未知项」与阶段收尾说明。
 
 ## 矩阵
 
@@ -31,7 +31,7 @@
 | 15 | PGN | 中国象棋 PGN 导入导出（变例/注释） | P0 | 2 | Done | 往返语义等价（8 集成 + 7 单元用例） | 导入导出框架 | UCI-Cyclone 记谱；中文纵线制导入不支持（NEEDS_VERIFICATION） |
 | 16 | TXT | 中文纵线制文本棋谱导入导出 | P1 | 2 | Not Started | 往返 + 换算边界 | 导入导出框架 | 线性为主 |
 | 17 | 东萍棋谱 | 东萍格式导入导出（支持变例） | P1 | 4 | Not Started | 往返 + 样本库 | 格式调研（NEEDS_VERIFICATION） | 语法待确认 |
-| 18 | 截图识别 | 棋盘图片识别局面（可人工校正） | P2 | 5 | Not Started | OCR 结构 + 校正 E2E | OCR 管线 | 可降级 |
+| 18 | 截图识别 | 棋盘图片识别局面（可人工校正） | P2 | 5 | Done | OCR 结构测试（Rust 8 单元 + 7 集成）+ OcrPanel 4 用例 | OCR 管线 | 传统 CV 模板匹配 v1：棋盘/棋子/位置/方向 + 置信度/问题 + 人工校正；真实模型（ONNX）待选型与许可（NEEDS_VERIFICATION） |
 | 19 | 本地开局库 | 离线开局库导入与查询 | P1 | 4 | In Progress | 查询/排序/过滤/JSON 往返单测 | Book Provider、格式调研 | Provider/查询/推荐已实现（内存+JSON）；导入格式待确认（NEEDS_VERIFICATION），SQLite 存储随 DB 阶段 |
 | 20 | 云库 | 皮卡鱼云库查询（W/D/L，可降级） | P2 | 4 | In Progress | 云库 mock + 回退测试 | 云库 API（NEEDS_VERIFICATION） | 接口与降级路径已实现并测试；查询本体待 API 确认 |
 | 21 | 自动走库 | 命中走库 + 脱库步数控制 | P2 | 4 | Done | 走库链路单测（脱库步数 2 用例 + 集成 2） | 本地/云库 | 命中走库 + 脱库步数（半回合门控）已实现（recommend_book + book_auto_move(max_plies)）；引擎回退循环待 UI 阶段 |
