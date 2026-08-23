@@ -3,8 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import { AnalysisPanel } from "./AnalysisPanel";
 import type { InfoLineDto } from "../../lib/engine/types";
 
-const DEFAULT_SETTINGS = { programPath: "", threads: 1, hash: 16, depth: null, multipv: 1 };
-
 function makeInfo(multipv: number, ...pv: string[]): InfoLineDto {
   return {
     depth: 8,
@@ -26,12 +24,10 @@ function renderPanel(overrides: Partial<Parameters<typeof AnalysisPanel>[0]> = {
     engineId: "mock",
     lines: { 1: makeInfo(1, "h2e2", "h7e7"), 2: makeInfo(2, "b0c2") },
     bestMove: { mv: "h2e2", ponder: null },
-    settings: DEFAULT_SETTINGS,
     message: null,
     onStart: vi.fn(),
     onStop: vi.fn(),
     onRestart: vi.fn(),
-    onApplySettings: vi.fn(),
     onPreview: vi.fn(),
     ...overrides,
   };
@@ -41,12 +37,10 @@ function renderPanel(overrides: Partial<Parameters<typeof AnalysisPanel>[0]> = {
       engineId={props.engineId}
       lines={props.lines}
       bestMove={props.bestMove}
-      settings={props.settings}
       message={props.message}
       onStart={props.onStart}
       onStop={props.onStop}
       onRestart={props.onRestart}
-      onApplySettings={props.onApplySettings}
       onPreview={props.onPreview}
     />,
   );
@@ -87,12 +81,6 @@ describe("AnalysisPanel", () => {
     expect(props.onStop).toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("engine-restart"));
     expect(props.onRestart).toHaveBeenCalled();
-  });
-
-  it("changes MultiPV via the select", () => {
-    const props = renderPanel();
-    fireEvent.change(screen.getByTestId("setting-multipv"), { target: { value: "3" } });
-    expect(props.onApplySettings).toHaveBeenCalledWith({ multipv: 3 });
   });
 
   it("shows the status badge", () => {

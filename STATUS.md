@@ -5,6 +5,20 @@
 
 ## 当前阶段
 
+**桌面 UI 打磨 ✅ 完成（2026-08-23）**
+
+UI/UX 阶段（不重构核心模块；UI 全部连接现有功能）：
+
+- ✅ **棋盘为视觉中心**：左侧固定宽度棋盘 + 导航工具栏（回到起点/上一步/下一步/终点/悔棋/重做/翻转/镜像/编辑，带快捷键 tooltip）。
+- ✅ **功能标签页**：棋谱 / 分析 / 开局库 / 导入导出 / 设置，入口集中、一目了然。
+- ✅ **开局库面板（新增）**：连接现有 `book_lookup/recommend/auto_move` 命令——当前局面候选（次数/胜率和负/得分）、推荐着法、自动走库、命中/未命中/加载/错误状态。
+- ✅ **设置集中（新增）**：主题（深浅色）+ 引擎参数（路径/线程/哈希/深度/MultiPV，持久化）+ **快捷键说明清单**。
+- ✅ 引擎参数从 AnalysisPanel 迁移到设置页，AnalysisPanel 专注引擎控制与结果展示。
+- ✅ Loading / Error / Empty 状态：加载中、开局库未命中/错误、引擎未启动提示、分析/评价曲线空态、OCR/导入导出错误消息。
+- ✅ 深浅色主题完整；窗口尺寸变化响应式（`xl` 断点左右布局、`min-w-0`、工具栏自动换行）。
+- ✅ 测试：新增 BookPanel 4、SettingsPanel 3、App 标签页切换 1；更新 AnalysisPanel 测试（设置迁移）。前端共 100 用例。
+- 未改动 Board Core / Game Tree / Engine Manager / UCI / Book Provider / Import-Export Core（无功能性 Bug）。
+
 **GIF 导出 ✅ 完成（2026-08-23）**
 
 - ✅ `src-tauri/src/gif_export.rs`：`GifRequest`（startpos + moves + 帧间隔/棋盘尺寸/坐标/棋步）+ `export_gif` → GIF 字节。
@@ -123,7 +137,7 @@
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
-| `npm run test` | ✅ | 93 个前端用例 |
+| `npm run test` | ✅ | 100 个前端用例 |
 | `npm run lint` | ✅ | 0 error 0 warning |
 | `npm run format:check` | ✅ | |
 | `npm run build` | ✅ | tsc + vite build |
@@ -186,3 +200,4 @@
 | 2026-08-23 | 截图识别完成：OcrEngine trait + TemplateRecognizer（传统 CV 模板匹配）+ 方向判定 + 合成截图生成器；识别只识别、棋规校验在本地 Rust（validate_position）；低置信度置空标记 + 置信度/问题清单 + OcrPanel 人工校正；提交 `feat: add screenshot recognition` |
 | 2026-08-23 | 自动复盘完成：AutoAnalyzer 异步运行器（n+1 次搜索）、可配置分类阈值（Best~Blunder）、着法/最佳/评价变化/深度/PV、评价曲线点击跳转、停止/继续/重新分析、mock 引擎确定性出分；提交 `feat: add automatic game analysis` |
 | 2026-08-23 | GIF 导出完成：当前局面/主线/指定变例来源、帧间隔/棋盘尺寸/坐标/棋步选项、gif crate 编码（固定调色板）、字库扩展数字/小写字母；提交 `feat: add gif export` |
+| 2026-08-23 | 桌面 UI 打磨：棋盘居中 + 功能标签页、新增开局库面板（连接 book 命令）、设置集中（主题/引擎参数/快捷键说明）、Loading/Error/Empty 状态、响应式布局；提交 `feat: polish desktop ui` |

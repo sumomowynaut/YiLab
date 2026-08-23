@@ -11,6 +11,8 @@ import { AnalysisReport } from "./components/analysis/AnalysisReport";
 import { GifExportPanel } from "./components/gif/GifExportPanel";
 import { GameCodec } from "./components/io/GameCodec";
 import { OcrPanel } from "./components/ocr/OcrPanel";
+import { BookPanel } from "./components/book/BookPanel";
+import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { getDefaultBoardApi } from "./lib/board/api";
 import { sideToColor } from "./lib/board/notation";
 import { getDefaultEngineApi } from "./lib/engine/api";
@@ -19,6 +21,7 @@ import { getDefaultIoApi } from "./lib/io/api";
 import { getDefaultOcrApi } from "./lib/ocr/api";
 import { getDefaultAnalysisApi } from "./lib/analysis/api";
 import { getDefaultGifApi } from "./lib/gif/api";
+import { getDefaultBookApi } from "./lib/book/api";
 import { useEngineStore } from "./stores/useEngineStore";
 import { useThemeStore } from "./stores/useThemeStore";
 import { useCurveStore } from "./stores/useCurveStore";
@@ -26,6 +29,16 @@ import { useAnalysisStore } from "./stores/useAnalysisStore";
 import { selectDisplayPosition, useGameStore } from "./stores/useGameStore";
 import type { VariationOption } from "./lib/gif/types";
 import type { TreeNodeDto } from "./lib/game/types";
+
+type TabKey = "game" | "analysis" | "book" | "io" | "settings";
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "game", label: "棋谱" },
+  { key: "analysis", label: "分析" },
+  { key: "book", label: "开局库" },
+  { key: "io", label: "导入导出" },
+  { key: "settings", label: "设置" },
+];
 
 function App() {
   const snapshot = useGameStore((state) => state.snapshot);
@@ -99,7 +112,6 @@ function App() {
   const engineId = useEngineStore((state) => state.engineId);
   const engineLines = useEngineStore((state) => state.lines);
   const engineBestMove = useEngineStore((state) => state.bestMove);
-  const engineSettings = useEngineStore((state) => state.settings);
   const engineMessage = useEngineStore((state) => state.message);
   const analysisEnabled = useEngineStore((state) => state.analysisEnabled);
   const preview = useEngineStore((state) => state.preview);
@@ -107,15 +119,16 @@ function App() {
   const engineStart = useEngineStore((state) => state.start);
   const engineStop = useEngineStore((state) => state.stop);
   const engineRestart = useEngineStore((state) => state.restart);
-  const engineApplySettings = useEngineStore((state) => state.applySettings);
   const engineStartAnalysis = useEngineStore((state) => state.startAnalysis);
   const enginePreviewPv = useEngineStore((state) => state.previewPv);
   const engineClearPreview = useEngineStore((state) => state.clearPreview);
+  const [tab, setTab] = useState<TabKey>("game");
   const [fenInput, setFenInput] = useState("");
   const [commentDraft, setCommentDraft] = useState("");
   const [ioApi] = useState(() => getDefaultIoApi());
   const [ocrApi] = useState(() => getDefaultOcrApi());
   const [gifApi] = useState(() => getDefaultGifApi());
+  const [bookApi] = useState(() => getDefaultBookApi());
 
   useEffect(() => {
     void init(getDefaultGameApi(), getDefaultBoardApi());
@@ -209,7 +222,7 @@ function App() {
   if (!snapshot || !position) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
-        <p>加载中…</p>
+        <p data-testid="loading">加载中…</p>
       </main>
     );
   }
@@ -217,12 +230,12 @@ function App() {
   const sideLabel = sideToColor(position.sideToMove) === "red" ? "红方" : "黑方";
 
   return (
-    <main className="flex min-h-screen items-start justify-center bg-background p-6 text-foreground">
-      <Card className="w-full max-w-5xl">
+    <main className="flex min-h-screen items-start justify-center bg-background p-3 text-foreground sm:p-6">
+      <Card className="w-full max-w-7xl">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>PikaXiangqi</CardTitle>
-            <CardDescription>中国象棋复盘与分析 — 棋谱树 + 引擎分析（Phase 3）</CardDescription>
+            <CardDescription>中国象棋复盘与分析 — 本地优先 · 引擎分析 · 自动复盘</CardDescription>
           </div>
           <Button
             variant="outline"
@@ -234,8 +247,10 @@ function App() {
             {theme === "dark" ? "☀ 浅色" : "🌙 深色"}
           </Button>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-6">
-          <div className="flex flex-col gap-2">
+
+        <CardContent className="flex flex-col gap-5 xl:flex-row">
+          {/* 左列：棋盘为视觉中心 */}
+          <div className="flex flex-col gap-3 xl:w-[440px] xl:shrink-0">
             {preview && (
               <div className="flex items-center gap-2 rounded border border-blue-300 bg-blue-50 px-2 py-1 text-xs text-blue-700">
                 <span>
@@ -259,9 +274,7 @@ function App() {
                 void handleSquareClick(sq);
               }}
             />
-          </div>
 
-          <div className="flex min-w-72 flex-1 flex-col gap-3">
             <div className="flex items-center gap-2 text-sm">
               <span>行棋方：</span>
               <span
@@ -278,10 +291,13 @@ function App() {
               )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            {/* 导航工具栏 */}
+            <div className="flex flex-wrap items-center gap-1">
               <Button
                 variant="outline"
                 size="sm"
+                title="回到起点 (Home)"
+                aria-label="回到起点"
                 onClick={() => void goToStart()}
                 disabled={!snapshot.hasParent}
               >
@@ -290,6 +306,8 @@ function App() {
               <Button
                 variant="outline"
                 size="sm"
+                title="上一步 (←)"
+                aria-label="上一步"
                 onClick={() => void previous()}
                 disabled={!snapshot.hasParent}
               >
@@ -298,126 +316,55 @@ function App() {
               <Button
                 variant="outline"
                 size="sm"
+                title="下一步 (→)"
+                aria-label="下一步"
                 onClick={() => void next()}
-                disabled={snapshot.nextMainId === null}
+                disabled={!snapshot.nextMainId}
               >
                 →
               </Button>
               <Button
                 variant="outline"
                 size="sm"
+                title="走到终点 (End)"
+                aria-label="走到终点"
                 onClick={() => void goToEnd()}
-                disabled={snapshot.nextMainId === null}
+                disabled={!snapshot.nextMainId}
               >
                 ⏭
               </Button>
+              <span className="mx-1 h-4 w-px bg-border" aria-hidden />
               <Button
                 variant="outline"
                 size="sm"
+                title="悔棋 (Ctrl+Z)"
+                aria-label="悔棋"
                 onClick={() => void undo()}
                 disabled={!snapshot.undoAvailable}
               >
-                悔棋
+                ↶
               </Button>
               <Button
                 variant="outline"
                 size="sm"
+                title="重做 (Ctrl+Y)"
+                aria-label="重做"
                 onClick={() => void redo()}
                 disabled={!snapshot.redoAvailable}
               >
-                重做
+                ↷
               </Button>
-            </div>
-
-            <MoveTree
-              tree={snapshot.tree}
-              currentId={snapshot.currentId}
-              expanded={expandedVariations}
-              onNavigate={(id) => void navigate(id)}
-              onToggleVariation={toggleVariation}
-              onDeleteVariation={(id) => void deleteVariation(id)}
-              onPromoteVariation={(id) => void promoteVariation(id)}
-              onReorderVariation={(parentId, from, to) => void reorderVariation(parentId, from, to)}
-            />
-
-            <AnalysisPanel
-              status={engineStatus}
-              engineId={engineId}
-              lines={engineLines}
-              bestMove={engineBestMove}
-              settings={engineSettings}
-              message={engineMessage}
-              onStart={() => void engineStart()}
-              onStop={() => void engineStop()}
-              onRestart={() => void engineRestart()}
-              onApplySettings={(patch) => void engineApplySettings(patch)}
-              onPreview={(pv) => {
-                if (snapshot) {
-                  void enginePreviewPv(pv, snapshot.currentFen);
-                }
-              }}
-            />
-
-            <EvalCurve points={curvePoints} onClear={curveClear} />
-
-            <GifExportPanel gifApi={gifApi} variations={variations} />
-
-            <AnalysisReport
-              status={analysisStatus}
-              progress={analysisProgress}
-              total={analysisTotal}
-              assessments={analysisAssessments}
-              onStart={() => void analysisStart(16, null)}
-              onStop={() => void analysisStop()}
-              onContinue={() => void analysisContinue()}
-              onRestart={() => void analysisStart(16, null)}
-              onNavigate={(nodeId) => void navigate(nodeId)}
-            />
-
-            <div className="flex flex-col gap-1">
-              <label htmlFor="comment" className="text-xs text-muted-foreground">
-                注释（当前棋步）
-              </label>
-              <textarea
-                id="comment"
-                value={commentDraft}
-                onChange={(event) => setCommentDraft(event.currentTarget.value)}
-                onBlur={() => void setComment(snapshot.currentId, commentDraft)}
-                rows={2}
-                placeholder="为当前棋步添加注释…"
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-              />
-              <div className="flex gap-1">
-                {["!", "?", "!!", "??", "!?", "?!"].map((nag) => {
-                  const active = snapshot.nags.includes(nag);
-                  return (
-                    <Button
-                      key={nag}
-                      variant={active ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => void setNag(snapshot.currentId, nag, !active)}
-                    >
-                      {nag}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <GameCodec ioApi={ioApi} onImported={(snap) => adoptSnapshot(snap)} />
-
-            <OcrPanel ocrApi={ocrApi} onLoaded={(fen) => void loadFen(fen)} />
-
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={rotateView}>
-                翻转棋盘
+              <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+              <Button variant="outline" size="sm" title="翻转棋盘 (F)" onClick={rotateView}>
+                ⇅
               </Button>
-              <Button variant="outline" size="sm" onClick={mirrorView}>
-                左右镜像
+              <Button variant="outline" size="sm" title="左右镜像 (M)" onClick={mirrorView}>
+                ⇄
               </Button>
               <Button
                 variant={editing ? "default" : "outline"}
                 size="sm"
+                title="编辑局面"
                 onClick={() => void toggleEditing()}
               >
                 {editing ? "完成编辑" : "编辑局面"}
@@ -437,38 +384,160 @@ function App() {
                 </div>
               </div>
             )}
+          </div>
 
-            <div className="flex flex-col gap-1">
-              <label htmlFor="fen" className="text-xs text-muted-foreground">
-                FEN
-              </label>
-              <div className="flex gap-2">
-                <input
-                  id="fen"
-                  value={fenInput}
-                  onChange={(event) => setFenInput(event.currentTarget.value)}
-                  placeholder="粘贴 FEN…"
-                  className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
-                />
-                <Button variant="secondary" size="sm" onClick={() => void loadFen(fenInput)}>
-                  载入
-                </Button>
-              </div>
-              <p className="break-all font-mono text-xs text-muted-foreground">{position.fen}</p>
+          {/* 右列：功能标签页 */}
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <div className="flex flex-wrap gap-1 border-b pb-1" role="tablist">
+              {TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  data-testid={`tab-${t.key}`}
+                  onClick={() => setTab(t.key)}
+                  className={`rounded-t px-3 py-1.5 text-sm transition-colors ${
+                    tab === t.key
+                      ? "border-b-2 border-primary font-semibold text-foreground"
+                      : "text-muted-foreground hover:bg-accent"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
             </div>
 
-            {validation &&
-              (validation.ok ? (
-                <p className="text-sm text-green-600">✓ 局面合法</p>
-              ) : (
-                <ul className="list-inside list-disc text-sm text-amber-600">
-                  {validation.issues.map((issue, index) => (
-                    <li key={index}>{issue}</li>
-                  ))}
-                </ul>
-              ))}
+            {tab === "game" && (
+              <div className="flex flex-col gap-3">
+                <MoveTree
+                  tree={snapshot.tree}
+                  currentId={snapshot.currentId}
+                  expanded={expandedVariations}
+                  onNavigate={(id) => void navigate(id)}
+                  onToggleVariation={toggleVariation}
+                  onDeleteVariation={(id) => void deleteVariation(id)}
+                  onPromoteVariation={(id) => void promoteVariation(id)}
+                  onReorderVariation={(parentId, from, to) =>
+                    void reorderVariation(parentId, from, to)
+                  }
+                />
 
-            {message && <p className="text-sm text-amber-600">{message}</p>}
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="comment" className="text-xs text-muted-foreground">
+                    注释（当前棋步）
+                  </label>
+                  <textarea
+                    id="comment"
+                    value={commentDraft}
+                    onChange={(event) => setCommentDraft(event.currentTarget.value)}
+                    onBlur={() => void setComment(snapshot.currentId, commentDraft)}
+                    rows={2}
+                    placeholder="为当前棋步添加注释…"
+                    className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                  <div className="flex gap-1">
+                    {["!", "?", "!!", "??", "!?", "?!"].map((nag) => {
+                      const active = snapshot.nags.includes(nag);
+                      return (
+                        <Button
+                          key={nag}
+                          variant={active ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => void setNag(snapshot.currentId, nag, !active)}
+                        >
+                          {nag}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="fen" className="text-xs text-muted-foreground">
+                    FEN
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="fen"
+                      value={fenInput}
+                      onChange={(event) => setFenInput(event.currentTarget.value)}
+                      placeholder="粘贴 FEN…"
+                      className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+                    />
+                    <Button variant="secondary" size="sm" onClick={() => void loadFen(fenInput)}>
+                      载入
+                    </Button>
+                  </div>
+                  <p className="break-all font-mono text-xs text-muted-foreground">
+                    {position.fen}
+                  </p>
+                </div>
+
+                {validation &&
+                  (validation.ok ? (
+                    <p className="text-sm text-green-600">✓ 局面合法</p>
+                  ) : (
+                    <ul className="list-inside list-disc text-sm text-amber-600">
+                      {validation.issues.map((issue, index) => (
+                        <li key={index}>{issue}</li>
+                      ))}
+                    </ul>
+                  ))}
+
+                {message && <p className="text-sm text-amber-600">{message}</p>}
+              </div>
+            )}
+
+            {tab === "analysis" && (
+              <div className="flex flex-col gap-3">
+                <AnalysisPanel
+                  status={engineStatus}
+                  engineId={engineId}
+                  lines={engineLines}
+                  bestMove={engineBestMove}
+                  message={engineMessage}
+                  onStart={() => void engineStart()}
+                  onStop={() => void engineStop()}
+                  onRestart={() => void engineRestart()}
+                  onPreview={(pv) => {
+                    if (snapshot) {
+                      void enginePreviewPv(pv, snapshot.currentFen);
+                    }
+                  }}
+                />
+                <EvalCurve points={curvePoints} onClear={curveClear} />
+                <AnalysisReport
+                  status={analysisStatus}
+                  progress={analysisProgress}
+                  total={analysisTotal}
+                  assessments={analysisAssessments}
+                  onStart={() => void analysisStart(16, null)}
+                  onStop={() => void analysisStop()}
+                  onContinue={() => void analysisContinue()}
+                  onRestart={() => void analysisStart(16, null)}
+                  onNavigate={(nodeId) => void navigate(nodeId)}
+                />
+              </div>
+            )}
+
+            {tab === "book" && (
+              <BookPanel
+                bookApi={bookApi}
+                currentFen={currentFen}
+                onAutoMove={(snap) => adoptSnapshot(snap)}
+              />
+            )}
+
+            {tab === "io" && (
+              <div className="flex flex-col gap-3">
+                <GameCodec ioApi={ioApi} onImported={(snap) => adoptSnapshot(snap)} />
+                <OcrPanel ocrApi={ocrApi} onLoaded={(fen) => void loadFen(fen)} />
+                <GifExportPanel gifApi={gifApi} variations={variations} />
+              </div>
+            )}
+
+            {tab === "settings" && <SettingsPanel />}
           </div>
         </CardContent>
       </Card>

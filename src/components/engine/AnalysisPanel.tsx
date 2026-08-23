@@ -1,4 +1,3 @@
-import type { EngineSettings } from "../../stores/useEngineStore";
 import type { BestMoveDto, EngineStatus, InfoLineDto } from "../../lib/engine/types";
 
 export interface AnalysisPanelProps {
@@ -6,12 +5,10 @@ export interface AnalysisPanelProps {
   engineId: string | null;
   lines: Record<number, InfoLineDto>;
   bestMove: BestMoveDto | null;
-  settings: EngineSettings;
   message: string | null;
   onStart: () => void;
   onStop: () => void;
   onRestart: () => void;
-  onApplySettings: (patch: Partial<EngineSettings>) => void;
   onPreview: (pv: string[]) => void;
 }
 
@@ -27,8 +24,6 @@ function formatScore(score: InfoLineDto["score"]): string {
 function formatNum(v: number | null): string {
   return v == null ? "—" : v.toLocaleString("en-US");
 }
-
-const MULTIPV_OPTIONS = [1, 2, 3, 5, 10];
 
 function StatusBadge({ status }: { status: EngineStatus }) {
   const map: Record<EngineStatus, string> = {
@@ -53,18 +48,16 @@ function StatusBadge({ status }: { status: EngineStatus }) {
   );
 }
 
-/** 引擎分析面板：评价 / 深度 / 节点 / NPS / 时间 / MultiPV / PV，支持预览与参数设置。 */
+/** 引擎分析面板：评价 / 深度 / 节点 / NPS / 时间 / MultiPV / PV，支持预览。 */
 export function AnalysisPanel({
   status,
   engineId,
   lines,
   bestMove,
-  settings,
   message,
   onStart,
   onStop,
   onRestart,
-  onApplySettings,
   onPreview,
 }: AnalysisPanelProps) {
   const sorted = Object.values(lines).sort((a, b) => a.multipv - b.multipv);
@@ -105,72 +98,6 @@ export function AnalysisPanel({
             重启
           </button>
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span>引擎路径</span>
-        <input
-          data-testid="engine-program"
-          value={settings.programPath}
-          onChange={(e) => onApplySettings({ programPath: e.currentTarget.value })}
-          placeholder="留空使用 PIKAFISH_BIN"
-          className="h-6 w-40 rounded border border-input bg-background px-1.5 text-xs"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-1 text-xs">
-        <label className="flex items-center gap-1">
-          线程
-          <input
-            type="number"
-            min={1}
-            data-testid="setting-threads"
-            value={settings.threads}
-            onChange={(e) => onApplySettings({ threads: Number(e.currentTarget.value) })}
-            className="h-6 w-14 rounded border border-input bg-background px-1"
-          />
-        </label>
-        <label className="flex items-center gap-1">
-          哈希(MB)
-          <input
-            type="number"
-            min={1}
-            data-testid="setting-hash"
-            value={settings.hash}
-            onChange={(e) => onApplySettings({ hash: Number(e.currentTarget.value) })}
-            className="h-6 w-14 rounded border border-input bg-background px-1"
-          />
-        </label>
-        <label className="flex items-center gap-1">
-          深度(0=无限)
-          <input
-            type="number"
-            min={0}
-            data-testid="setting-depth"
-            value={settings.depth ?? 0}
-            onChange={(e) =>
-              onApplySettings({
-                depth: Number(e.currentTarget.value) > 0 ? Number(e.currentTarget.value) : null,
-              })
-            }
-            className="h-6 w-14 rounded border border-input bg-background px-1"
-          />
-        </label>
-        <label className="flex items-center gap-1">
-          MultiPV
-          <select
-            data-testid="setting-multipv"
-            value={settings.multipv}
-            onChange={(e) => onApplySettings({ multipv: Number(e.currentTarget.value) })}
-            className="h-6 rounded border border-input bg-background px-1"
-          >
-            {MULTIPV_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
 
       {message && (

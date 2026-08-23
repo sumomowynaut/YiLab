@@ -47,4 +47,30 @@ describe("App", () => {
     fireEvent.click(button);
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
+
+  it("switches between feature tabs", async () => {
+    render(<App />);
+    await screen.findByText("帅");
+    // 默认「棋谱」标签显示棋谱树
+    expect(screen.getByTestId("move-tree-empty")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tab-analysis"));
+    expect(screen.getByTestId("analysis-panel")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tab-book"));
+    expect(screen.getByTestId("book-panel")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tab-io"));
+    expect(screen.getByTestId("game-codec")).toBeInTheDocument();
+    expect(screen.getByTestId("ocr-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("gif-panel")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tab-settings"));
+    expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+    // 设置页显示快捷键说明
+    expect(screen.getByTestId("settings-shortcuts")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("tab-game"));
+    expect(screen.getByTestId("move-tree-empty")).toBeInTheDocument();
+  });
 });
