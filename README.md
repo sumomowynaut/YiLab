@@ -19,7 +19,7 @@
 - Windows 安装版与免安装版
 - <img width="500" height="500" alt="image" src="https://github.com/user-attachments/assets/683e6910-452b-4b65-b818-8c6ad5757364" />
 - <img width="500" height="500" alt="image" src="https://github.com/user-attachments/assets/d46d4268-dcc9-4c40-8b3c-01e86321462e" />
-<img width="500" height="500" alt="800" src="https://github.com/user-attachments/assets/08aa5f2e-baee-4b31-8ec1-ea4a2b5f7ec9" />
+- <img width="500" height="500" alt="800" src="https://github.com/user-attachments/assets/08aa5f2e-baee-4b31-8ec1-ea4a2b5f7ec9" />
 
 
 
