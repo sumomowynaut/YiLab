@@ -7,6 +7,7 @@ import { Button } from "./components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
 import { AnalysisPanel } from "./components/engine/AnalysisPanel";
 import { EvalCurve } from "./components/engine/EvalCurve";
+import { AnalysisReport } from "./components/analysis/AnalysisReport";
 import { GameCodec } from "./components/io/GameCodec";
 import { OcrPanel } from "./components/ocr/OcrPanel";
 import { getDefaultBoardApi } from "./lib/board/api";
@@ -15,9 +16,11 @@ import { getDefaultEngineApi } from "./lib/engine/api";
 import { getDefaultGameApi } from "./lib/game/api";
 import { getDefaultIoApi } from "./lib/io/api";
 import { getDefaultOcrApi } from "./lib/ocr/api";
+import { getDefaultAnalysisApi } from "./lib/analysis/api";
 import { useEngineStore } from "./stores/useEngineStore";
 import { useThemeStore } from "./stores/useThemeStore";
 import { useCurveStore } from "./stores/useCurveStore";
+import { useAnalysisStore } from "./stores/useAnalysisStore";
 import { selectDisplayPosition, useGameStore } from "./stores/useGameStore";
 
 function App() {
@@ -60,6 +63,14 @@ function App() {
   const curvePoints = useCurveStore((state) => state.points);
   const curveRecord = useCurveStore((state) => state.record);
   const curveClear = useCurveStore((state) => state.clear);
+  const analysisStatus = useAnalysisStore((state) => state.status);
+  const analysisProgress = useAnalysisStore((state) => state.progress);
+  const analysisTotal = useAnalysisStore((state) => state.total);
+  const analysisAssessments = useAnalysisStore((state) => state.assessments);
+  const analysisInit = useAnalysisStore((state) => state.init);
+  const analysisStart = useAnalysisStore((state) => state.start);
+  const analysisStop = useAnalysisStore((state) => state.stop);
+  const analysisContinue = useAnalysisStore((state) => state.continue);
   const engineStatus = useEngineStore((state) => state.status);
   const engineId = useEngineStore((state) => state.engineId);
   const engineLines = useEngineStore((state) => state.lines);
@@ -89,6 +100,11 @@ function App() {
   useEffect(() => {
     initTheme();
   }, [initTheme]);
+
+  // 自动复盘初始化（订阅事件）
+  useEffect(() => {
+    analysisInit(getDefaultAnalysisApi());
+  }, [analysisInit]);
 
   // 引擎初始化（订阅事件）
   useEffect(() => {
@@ -318,6 +334,18 @@ function App() {
             />
 
             <EvalCurve points={curvePoints} onClear={curveClear} />
+
+            <AnalysisReport
+              status={analysisStatus}
+              progress={analysisProgress}
+              total={analysisTotal}
+              assessments={analysisAssessments}
+              onStart={() => void analysisStart(16, null)}
+              onStop={() => void analysisStop()}
+              onContinue={() => void analysisContinue()}
+              onRestart={() => void analysisStart(16, null)}
+              onNavigate={(nodeId) => void navigate(nodeId)}
+            />
 
             <div className="flex flex-col gap-1">
               <label htmlFor="comment" className="text-xs text-muted-foreground">

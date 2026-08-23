@@ -5,6 +5,20 @@
 
 ## 当前阶段
 
+**自动复盘（Automatic Game Analysis）✅ 完成（2026-08-23）**
+
+- ✅ `src-tauri/src/analysis.rs`：`AutoAnalyzer`（tokio 异步运行器，**不阻塞 UI**）+ `MoveAssessment`。
+- ✅ 对主线每一步记录：实际着法 / 最佳着法 / 走前评价 / 走后评价 / **评价损失** / 深度 / PV。
+- ✅ **分类阈值可配置**（`ClassificationConfig`，不硬编码）：Best / Excellent / Good / Inaccuracy / Mistake / Blunder，
+  按「走子方视角前后评价差」分类。
+- ✅ 效率：n 步棋只需 n+1 次有限深度搜索（局面 i 的搜索同时是第 i-1 步的走后评价与第 i 步的走前评价）。
+- ✅ 支持 停止（暂停）/ 继续 / 重新分析：单一持久运行任务 + `Notify` 唤醒，无并发重复。
+- ✅ 事件流：`analysis://event`（StatusChanged / Progress / Assessment / Finished）→ 前端 store 实时更新。
+- ✅ 前端 `AnalysisReport`：**评价曲线（点击跳转棋步）** + 汇总（关键失误 / 最佳着法 / 评价变化表 / PV）+ 开始/停止/继续/重新分析。
+- ✅ Tauri 命令：`analysis_start` / `analysis_stop` / `analysis_continue` / `analysis_status`；mock 引擎扩展为按局面确定性出分。
+- ✅ 测试：Rust 单元 3 + 集成 3（完整分析 / 停止继续 / 进度事件）+ 前端 store 4 + 报告 5。
+- ⚪ 「落库」（评估结果持久化）随 DB（SQLite）阶段；`NEEDS_VERIFICATION`：真实 Pikafish 分数视角（红方 vs 行棋方）需冒烟核实。
+
 **截图识别（Screenshot Recognition / OCR）✅ 完成（2026-08-23）**
 
 - ✅ `src-tauri/src/ocr/`：`OcrEngine` trait（视觉模型抽象）+ `TemplateRecognizer`（传统 CV，确定性模板匹配）+ 合成截图生成器 `render`。
@@ -93,11 +107,11 @@
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 104 lib + 10 engine_manager + 30 game_tree + 3 io_codec + 7 ocr + 10 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
+| `cargo test` | ✅ | 107 lib + 10 engine_manager + 30 game_tree + 3 analysis + 3 io_codec + 7 ocr + 10 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
-| `npm run test` | ✅ | 79 个前端用例 |
+| `npm run test` | ✅ | 88 个前端用例 |
 | `npm run lint` | ✅ | 0 error 0 warning |
 | `npm run format:check` | ✅ | |
 | `npm run build` | ✅ | tsc + vite build |
@@ -158,3 +172,4 @@
 | 2026-08-23 | Web Feature Parity：核对已实现功能（#8 注释/#10 UCI/#11 MultiPV → Done）；实现 #13 导入导出框架（Codec trait + 嗅探 + 粘贴/文件导入 + 复制/下载导出 UI）；提交 `docs: reconcile…` 与 `feat: add import/export framework` |
 | 2026-08-23 | Web Feature Parity（续）：#25/#26 深浅色主题、#27 可配置快捷键、#21 脱库步数、#12 引擎参数持久化、#22 评价曲线、#30 CI 对齐；每项独立提交 |
 | 2026-08-23 | 截图识别完成：OcrEngine trait + TemplateRecognizer（传统 CV 模板匹配）+ 方向判定 + 合成截图生成器；识别只识别、棋规校验在本地 Rust（validate_position）；低置信度置空标记 + 置信度/问题清单 + OcrPanel 人工校正；提交 `feat: add screenshot recognition` |
+| 2026-08-23 | 自动复盘完成：AutoAnalyzer 异步运行器（n+1 次搜索）、可配置分类阈值（Best~Blunder）、着法/最佳/评价变化/深度/PV、评价曲线点击跳转、停止/继续/重新分析、mock 引擎确定性出分；提交 `feat: add automatic game analysis` |

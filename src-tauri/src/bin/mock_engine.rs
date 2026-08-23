@@ -14,14 +14,44 @@ fn param_value<'a>(parts: &[&'a str], key: &str) -> Option<&'a str> {
     parts.windows(2).find(|w| w[0] == key).map(|w| w[1])
 }
 
+/// 简单确定性哈希（分析测试需要「不同局面 → 不同分数」）。
+fn hash_str(s: &str) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in s.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100_0000_01b3);
+    }
+    h
+}
+
+const CANDIDATES: [&str; 5] = ["h2e2", "b0c2", "h0g2", "h9g7", "b9c7"];
+
 fn emit_search_result(out: &mut io::Stdout, position_line: &str) {
-    let _ = writeln!(out, "info depth 8 seldepth 10 multipv 1 score cp 35 nodes 12345 nps 456789 time 123 pv h2e2 h7e7");
-    let _ = writeln!(out, "info depth 9 seldepth 11 multipv 1 score cp 38 nodes 23456 nps 456789 time 234 pv h2e2 h7e7 h0g2");
+    // 起始局面（`position startpos`）保持历史固定输出，兼容旧测试
+    if position_line.trim() == "position startpos" {
+        let _ = writeln!(out, "info depth 8 seldepth 10 multipv 1 score cp 35 nodes 12345 nps 456789 time 123 pv h2e2 h7e7");
+        let _ = writeln!(out, "info depth 9 seldepth 11 multipv 1 score cp 38 nodes 23456 nps 456789 time 234 pv h2e2 h7e7 h0g2");
+        let _ = writeln!(out, "bestmove h2e2 ponder h7e7");
+        return;
+    }
+    let h = hash_str(position_line);
+    // 分数范围 [-100, 100]，随局面确定性变化（自动复盘测试用）
+    let score = (h % 201) as i32 - 100;
+    let best = CANDIDATES[(h % CANDIDATES.len() as u64) as usize];
+    let _ = writeln!(
+        out,
+        "info depth 8 seldepth 10 multipv 1 score cp {score} nodes 12345 nps 456789 time 123 pv {best}"
+    );
+    let _ = writeln!(
+        out,
+        "info depth 9 seldepth 11 multipv 1 score cp {} nodes 23456 nps 456789 time 234 pv {best} h7e7",
+        score + 3
+    );
     // 若局面行包含特定 FEN 片段，可换一个 bestmove（用于「分析期间切换局面」测试）
     if position_line.contains("b0c2") {
         let _ = writeln!(out, "bestmove b0c2 ponder b9c7");
     } else {
-        let _ = writeln!(out, "bestmove h2e2 ponder h7e7");
+        let _ = writeln!(out, "bestmove {best} ponder h7e7");
     }
 }
 

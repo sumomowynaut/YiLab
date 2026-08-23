@@ -8,7 +8,7 @@
 - **Phase**：0~6（见 `development-plan.md` §2）。
 - **Status**：`Not Started` / `In Progress` / `Done` / `Blocked` / `Needs Verification`。
 
-> 当前进度（2026-08-23）：Done 19 / In Progress 4 / Not Started 8（截图识别 #18 已完成）。`NEEDS_VERIFICATION` 项见 `docs/development-plan.md`「未知项」与阶段收尾说明。
+> 当前进度（2026-08-23）：Done 20 / In Progress 4 / Not Started 7（自动复盘 #23 已完成）。`NEEDS_VERIFICATION` 项见 `docs/development-plan.md`「未知项」与阶段收尾说明。
 
 ## 矩阵
 
@@ -36,7 +36,7 @@
 | 20 | 云库 | 皮卡鱼云库查询（W/D/L，可降级） | P2 | 4 | In Progress | 云库 mock + 回退测试 | 云库 API（NEEDS_VERIFICATION） | 接口与降级路径已实现并测试；查询本体待 API 确认 |
 | 21 | 自动走库 | 命中走库 + 脱库步数控制 | P2 | 4 | Done | 走库链路单测（脱库步数 2 用例 + 集成 2） | 本地/云库 | 命中走库 + 脱库步数（半回合门控）已实现（recommend_book + book_auto_move(max_plies)）；引擎回退循环待 UI 阶段 |
 | 22 | 评价曲线 | 主变分数随回合曲线图 | P1 | 3 | Done | 分数序列计算（4 用例）+ 图表渲染（3 用例） | 引擎 info、analysis 表 | 会话内曲线（红方视角 cp，multipv=1）；持久化随 DB 阶段 |
-| 23 | 自动复盘 | 整局批量分析 + 逐着点评 + 落库 | P1 | 5 | Not Started | 批量分析流程 E2E | 引擎、评价曲线、DB | 异步执行 |
+| 23 | 自动复盘 | 整局批量分析 + 逐着点评 + 落库 | P1 | 5 | Done | 自动复盘集成测试（3）+ 前端 store 4 + 报告 5 用例 | 引擎、评价曲线、DB | 主线逐着分析（着法/最佳/走前走后评价/损失/深度/PV）+ 可配置分类阈值（Best~Blunder）+ 评价曲线点击跳转 + 停止/继续/重新分析；「落库」随 DB 阶段 |
 | 24 | GIF | 导出棋局动态图 | P2 | 5 | Not Started | GIF 产出可播放测试 | UI 渲染、导出 | 独立渲染管线 |
 | 25 | 深色模式 | 深色主题 | P1 | 1 | Done | 主题 store 测试（4 用例）+ App 切换测试 | Tailwind/shadcn 主题令牌 | 与浅色共主题体系；localStorage 持久化 + 跟随系统偏好 |
 | 26 | 浅色模式 | 浅色主题 | P1 | 1 | Done | 主题 store 测试（4 用例）+ App 切换测试 | 主题令牌 | 默认浅色（`:root`），随主题切换 |

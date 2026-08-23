@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
+pub mod analysis;
 pub mod board;
 pub mod book;
 mod commands;
@@ -68,7 +69,11 @@ pub fn run() {
             commands::book_auto_move,
             commands::io_import,
             commands::io_export,
-            commands::ocr_recognize
+            commands::ocr_recognize,
+            commands::analysis_start,
+            commands::analysis_stop,
+            commands::analysis_continue,
+            commands::analysis_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

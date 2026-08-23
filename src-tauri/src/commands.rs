@@ -1,5 +1,6 @@
 //! Tauri IPC 命令层：棋盘核心（board）与棋谱树（game）的薄封装。
 
+use crate::analysis::{AnalysisConfig, AutoAnalyzer, MoveAssessment, PlannedMove};
 use crate::board::{
     dto::PositionDto,
     fen::{parse_fen, to_fen},
@@ -531,4 +532,154 @@ pub fn ocr_recognize(image: Vec<u8>) -> Result<OcrResultDto, String> {
     let engine = crate::ocr::template::TemplateRecognizer::new();
     let output = crate::ocr::recognize(&engine, &input).map_err(|e| e.to_string())?;
     Ok(OcrResultDto::from(&output))
+}
+
+// ===================== 自动复盘（Analysis）命令 =====================
+
+fn analyzer() -> &'static AutoAnalyzer {
+    static ANALYZER: OnceLock<AutoAnalyzer> = OnceLock::new();
+    ANALYZER.get_or_init(AutoAnalyzer::new)
+}
+
+fn analysis_forwarder() -> &'static Mutex<Option<tokio::task::JoinHandle<()>>> {
+    static F: OnceLock<Mutex<Option<tokio::task::JoinHandle<()>>>> = OnceLock::new();
+    F.get_or_init(|| Mutex::new(None))
+}
+
+/// 确保有一个事件转发任务把分析事件推到前端（幂等）。
+fn ensure_analysis_forwarder(app: AppHandle) {
+    let mut guard = analysis_forwarder()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    if guard.is_none() {
+        let mut rx = analyzer().subscribe();
+        *guard = Some(tokio::spawn(async move {
+            while let Ok(ev) = rx.recv().await {
+                let _ = app.emit("analysis://event", ev);
+            }
+        }));
+    }
+}
+
+/// 单步评估 DTO。
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveAssessmentDto {
+    pub node_id: u64,
+    pub mv: String,
+    pub best_move: String,
+    pub eval_before_cp: i32,
+    pub eval_after_cp: i32,
+    pub loss_cp: i32,
+    pub depth: u32,
+    pub pv: Vec<String>,
+    pub category: String,
+}
+
+impl From<&MoveAssessment> for MoveAssessmentDto {
+    fn from(a: &MoveAssessment) -> Self {
+        MoveAssessmentDto {
+            node_id: a.node_id,
+            mv: a.mv.clone(),
+            best_move: a.best_move.clone(),
+            eval_before_cp: a.eval_before_cp,
+            eval_after_cp: a.eval_after_cp,
+            loss_cp: a.loss_cp,
+            depth: a.depth,
+            pv: a.pv.clone(),
+            category: a.category.name().to_string(),
+        }
+    }
+}
+
+/// 自动复盘状态 DTO。
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisStatusDto {
+    pub status: String,
+    pub progress: usize,
+    pub total: usize,
+    pub assessments: Vec<MoveAssessmentDto>,
+}
+
+fn analysis_dto() -> AnalysisStatusDto {
+    let (status, progress, total, assessments) = analyzer().snapshot();
+    AnalysisStatusDto {
+        status: status.name().to_string(),
+        progress,
+        total,
+        assessments: assessments.iter().map(MoveAssessmentDto::from).collect(),
+    }
+}
+
+/// 快照当前棋谱主线（从棋谱树读取，短临界区）。
+fn plan_from_tree() -> Result<(String, Vec<PlannedMove>), String> {
+    let tree = game_tree().lock().map_err(game_err)?;
+    let mainline = tree.main_line();
+    let mut plan = Vec::new();
+    for id in mainline.iter().skip(1) {
+        let n = tree.node(*id).map_err(game_err)?;
+        let mv = n.mv.ok_or("主线节点缺少着法")?;
+        plan.push(PlannedMove {
+            node_id: *id,
+            mv: mv.uci(),
+            is_red: n.is_red(),
+        });
+    }
+    Ok((tree.startpos.clone(), plan))
+}
+
+/// 获取当前引擎管理器（克隆 Arc，不跨 await 持锁）。
+fn current_engine() -> Result<std::sync::Arc<EngineManager>, String> {
+    let guard = engine_instance().lock().map_err(game_err)?;
+    guard
+        .as_ref()
+        .map(|i| i.mgr.clone())
+        .ok_or_else(|| "引擎未启动".to_string())
+}
+
+/// 开始自动复盘（重新分析 = 再次调用）。
+#[tauri::command]
+pub async fn analysis_start(
+    depth: Option<u32>,
+    movetime_ms: Option<u64>,
+    app: AppHandle,
+) -> Result<AnalysisStatusDto, String> {
+    if depth.is_none() && movetime_ms.is_none() {
+        return Err("请指定 depth 或 movetime_ms".to_string());
+    }
+    let (startpos, moves) = plan_from_tree()?;
+    let mgr = current_engine()?;
+    let config = AnalysisConfig {
+        depth,
+        movetime_ms,
+        ..AnalysisConfig::default()
+    };
+    ensure_analysis_forwarder(app);
+    analyzer().start(mgr, startpos, moves, config);
+    Ok(analysis_dto())
+}
+
+/// 停止（暂停）自动复盘：先停引擎当前搜索，再暂停运行器。
+#[tauri::command]
+pub async fn analysis_stop() -> Result<(), String> {
+    if let Ok(mgr) = current_engine() {
+        let _ = mgr.stop().await;
+    }
+    analyzer().stop();
+    Ok(())
+}
+
+/// 继续被暂停的自动复盘。
+#[tauri::command]
+pub async fn analysis_continue() -> Result<AnalysisStatusDto, String> {
+    let mgr = current_engine()?;
+    analyzer().resume(mgr);
+    Ok(analysis_dto())
+}
+
+/// 查询自动复盘状态与已完成的评估。
+#[tauri::command]
+pub fn analysis_status() -> Result<AnalysisStatusDto, String> {
+    Ok(analysis_dto())
 }
