@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "PikaXiangqi — 中国象棋复盘与分析桌面应用"
 authors = ["PikaXiangqi contributors"]
 edition = "2021"
+# 多个 binary（mock_engine/pikaxiangqi）时，指定 dev/run 默认运行的二进制（Tauri dev 需要）。
+default-run = "pikaxiangqi"
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary

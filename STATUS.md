@@ -5,6 +5,37 @@
 
 ## 当前阶段
 
+**Release Blocker 修复 ✅ 完成（2026-08-23）**
+
+**B1（Critical）Pikafish NNUE 开箱即用 ✅ 已修复**
+
+- 新增 `engine::manager::discover_eval_file(program)`：在引擎 exe 同目录 / 上一级目录自动发现 `pikafish.nnue`（覆盖官方发布包布局与「权重旁置」布局），**不硬编码任何本机路径**。
+- `engine_start` 把引擎工作目录设为权重所在目录（`EngineConfig.cwd`），引擎用相对默认值 `pikafish.nnue` 加载——规避「setoption EvalFile 绝对路径」在中文/空格路径下失败的问题。
+- React 与 Pikafish 保持解耦（前端仍只传 `programPath`，零 UI 改动）。
+- 测试：`discover_eval_file` 单测 3（同目录/上一级/缺失）；**真实 Pikafish 冒烟通过**（仅设 `PIKAFISH_BIN`，不设 cwd/evalfile，权重自动发现后分析出 bestmove）。
+
+**B2（High）License / LICENSE 未决 🔒 BLOCKED（需人工决策）**
+
+- `docs/licensing.md` 已补：仓库无 `LICENSE` 文件、NNUE 权重非商用条款、捆绑形态、本项目许可证选择，均列为「发布前必须决策」，**不代为判断**。
+- 分发/打包策略未改动（保持现状）。`#28/#29/#31` 仍受许可决策阻塞。
+
+**B3（High）当前棋局最小保存/恢复 ✅ 已修复**
+
+- `game::serialize::save_game/load_game`：持久化文档（Game Tree/注释/NAG/头信息）+ **当前节点**（重做栈不持久化）。
+- 命令 `game_save` / `game_load`（写入应用数据目录 `current-game.json`）。
+- 前端：`GameApi.save/load` + `useGameStore.saveGame/loadGame` + 棋谱标签「保存棋局 / 载入棋局」按钮（最小 UI）。
+- 顺带修复：`from_tree_json` 改用 `apply_move` 校验合法性，消除 `make_unchecked` 对「空源格着法」的 panic（B3 加载路径会触发该风险）。
+- 测试：`save/load` 往返（含当前节点/注释/NAG/变例）、根节点保存、非法着法返回错误不 panic。
+
+**Recommended 已低成本处理 ✅**
+
+- OCR 图片大小上限（20MB）、GIF 棋盘尺寸钳制（16..256）。
+
+**Recommended 未处理（记录 TODO，避免扩大范围）**
+
+- 棋局替换（导入/新局/FEN）时清理 analysis/curve/book 瞬态状态。
+- 自动复盘运行中重启/退出引擎的状态联动（运行器持有旧 mgr）。
+
 **桌面 UI 打磨 ✅ 完成（2026-08-23）**
 
 UI/UX 阶段（不重构核心模块；UI 全部连接现有功能）：
@@ -133,11 +164,11 @@ UI/UX 阶段（不重构核心模块；UI 全部连接现有功能）：
 
 | 命令 | 结果 | 说明 |
 |------|------|------|
-| `cargo test` | ✅ | 114 lib + 10 engine_manager + 30 game_tree + 3 analysis + 3 gif_export + 3 io_codec + 7 ocr + 10 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
+| `cargo test` | ✅ | 117 lib + 10 engine_manager + 33 game_tree + 3 analysis + 3 gif_export + 3 io_codec + 7 ocr + 10 opening_book + 8 pgn_roundtrip（+1 pikafish 冒烟默认 ignore；沙箱需清单变通） |
 | `cargo clippy --all-targets -- -D warnings` | ✅ | |
 | `cargo fmt --check` | ✅ | |
 | `cargo check` | ✅ | |
-| `npm run test` | ✅ | 100 个前端用例 |
+| `npm run test` | ✅ | 101 个前端用例 |
 | `npm run lint` | ✅ | 0 error 0 warning |
 | `npm run format:check` | ✅ | |
 | `npm run build` | ✅ | tsc + vite build |
@@ -201,3 +232,4 @@ UI/UX 阶段（不重构核心模块；UI 全部连接现有功能）：
 | 2026-08-23 | 自动复盘完成：AutoAnalyzer 异步运行器（n+1 次搜索）、可配置分类阈值（Best~Blunder）、着法/最佳/评价变化/深度/PV、评价曲线点击跳转、停止/继续/重新分析、mock 引擎确定性出分；提交 `feat: add automatic game analysis` |
 | 2026-08-23 | GIF 导出完成：当前局面/主线/指定变例来源、帧间隔/棋盘尺寸/坐标/棋步选项、gif crate 编码（固定调色板）、字库扩展数字/小写字母；提交 `feat: add gif export` |
 | 2026-08-23 | 桌面 UI 打磨：棋盘居中 + 功能标签页、新增开局库面板（连接 book 命令）、设置集中（主题/引擎参数/快捷键说明）、Loading/Error/Empty 状态、响应式布局；提交 `feat: polish desktop ui` |
+| 2026-08-23 | Release Blocker 修复：B1 NNUE 自动发现 + cwd 加载（真实引擎冒烟通过）、B3 最小棋局保存/恢复（save_game/load_game + UI + from_tree_json panic 修复）、B2 许可文档完善并标记 BLOCKED、OCR/GIF 输入上限；提交 `fix: resolve release blockers` |

@@ -52,6 +52,8 @@ beforeEach(() => {
   gameApi = {
     newGame: vi.fn(async () => makeSnapshot()),
     snapshot: vi.fn(async () => makeSnapshot()),
+    save: vi.fn(async () => undefined),
+    load: vi.fn(async () => makeSnapshot({ currentId: 5 })),
     insertMove: vi.fn(async () => makeSnapshot()),
     navigate: vi.fn(async () => makeSnapshot({ currentId: 5 })),
     previous: vi.fn(async () => makeSnapshot()),
@@ -150,6 +152,18 @@ describe("useGameStore", () => {
     expect(gameApi.setComment).toHaveBeenCalledWith(7, "注释");
     await useGameStore.getState().setNag(7, "!", true);
     expect(gameApi.setNag).toHaveBeenCalledWith(7, "!", true);
+  });
+
+  it("saves and loads the current game", async () => {
+    await useGameStore.getState().init(gameApi, boardApi);
+    await useGameStore.getState().saveGame();
+    expect(gameApi.save).toHaveBeenCalledTimes(1);
+    expect(useGameStore.getState().message).toBe("已保存当前棋局");
+
+    await useGameStore.getState().loadGame();
+    expect(gameApi.load).toHaveBeenCalledTimes(1);
+    expect(useGameStore.getState().snapshot?.currentId).toBe(5);
+    expect(useGameStore.getState().message).toBe("已载入上次保存的棋局");
   });
 
   it("rebases the tree when leaving edit mode", async () => {

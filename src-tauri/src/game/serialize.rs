@@ -25,7 +25,7 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use serde::{Deserialize, Serialize};
 
 use crate::board::fen::{parse_fen, to_fen};
-use crate::board::rules::make_unchecked;
+use crate::board::rules::apply_move;
 use crate::board::types::{Move, Position};
 
 use super::nag::Nag;
@@ -53,9 +53,9 @@ pub struct SerializedNode {
     pub children: Vec<NodeId>,
 }
 
-/// 序列化棋谱文档（不含 current / redo_stack 等会话状态）。
-pub fn to_tree_json(tree: &GameTree) -> Result<String, String> {
-    let doc = TreeDocument {
+/// 构建棋谱文档（不含 current / redo_stack 等会话状态）。
+fn build_document(tree: &GameTree) -> TreeDocument {
+    TreeDocument {
         version: TREE_JSON_VERSION,
         startpos: tree.startpos.clone(),
         headers: tree.headers.clone(),
@@ -75,8 +75,48 @@ pub fn to_tree_json(tree: &GameTree) -> Result<String, String> {
                 )
             })
             .collect(),
-    };
+    }
+}
+
+/// 序列化棋谱文档（不含 current / redo_stack 等会话状态）。
+pub fn to_tree_json(tree: &GameTree) -> Result<String, String> {
+    let doc = build_document(tree);
     serde_json::to_string_pretty(&doc).map_err(|e| format!("序列化棋谱失败：{e}"))
+}
+
+/// 「当前棋局」持久化文件格式（B3 最小保存/恢复）：文档 + 当前节点。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SavedGame {
+    version: u32,
+    current: NodeId,
+    document: TreeDocument,
+}
+
+pub const SAVED_GAME_VERSION: u32 = 1;
+
+/// 保存当前棋局（文档 + 当前节点；重做栈不持久化）。
+pub fn save_game(tree: &GameTree) -> Result<String, String> {
+    let saved = SavedGame {
+        version: SAVED_GAME_VERSION,
+        current: tree.current,
+        document: build_document(tree),
+    };
+    serde_json::to_string_pretty(&saved).map_err(|e| format!("序列化当前棋局失败：{e}"))
+}
+
+/// 恢复已保存的当前棋局（校验结构、着法合法性，并恢复当前节点）。
+pub fn load_game(s: &str) -> Result<GameTree, String> {
+    let saved: SavedGame = serde_json::from_str(s).map_err(|e| format!("解析棋局存档失败：{e}"))?;
+    if saved.version != SAVED_GAME_VERSION {
+        return Err(format!("不支持的棋局存档版本：{}", saved.version));
+    }
+    let doc_json =
+        serde_json::to_string(&saved.document).map_err(|e| format!("解析棋局文档失败：{e}"))?;
+    let mut tree = from_tree_json(&doc_json)?;
+    tree.set_current(saved.current)
+        .map_err(|e| format!("恢复当前节点 {} 失败：{e}", saved.current))?;
+    Ok(tree)
 }
 
 /// 反序列化棋谱文档为新的棋谱树。
@@ -154,7 +194,8 @@ pub fn from_tree_json(s: &str) -> Result<GameTree, String> {
                 return Err(format!("棋谱树存在环或重复引用：{old_child}"));
             }
             let mv = moves[old_child].ok_or_else(|| format!("非根节点 {old_child} 缺少着法"))?;
-            let pos = make_unchecked(&parent_pos, mv);
+            let pos = apply_move(&parent_pos, mv)
+                .ok_or_else(|| format!("节点 {old_child} 着法非法：{}", mv.uci()))?;
             let fen = to_fen(&pos);
             let node = GameNode {
                 id: *old_child,

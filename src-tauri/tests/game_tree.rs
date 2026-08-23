@@ -503,3 +503,74 @@ fn tree_json_rejects_malformed_documents() {
     let bad_fen = serde_json::to_string(&value).unwrap();
     assert!(serialize::from_tree_json(&bad_fen).is_err());
 }
+
+// ---------- 当前棋局保存/恢复（B3） ----------
+
+#[test]
+fn save_load_game_preserves_tree_and_current_node() {
+    let mut t = tree();
+    let a = t.insert_move(mv("h2e2")).unwrap();
+    t.set_comment_at(a, "中炮".to_string()).unwrap();
+    t.set_nag_at(a, Nag::Good, true).unwrap();
+    let b = t.insert_move(mv("h7e7")).unwrap();
+    // 根下加一支变例（红方 b0c2）
+    t.go_to_start().unwrap();
+    let v = t.insert_move(mv("b0c2")).unwrap();
+    t.set_comment_at(v, "变例".to_string()).unwrap();
+
+    // 当前节点停在 h7e7（非根），并有注释/NAG
+    t.set_current(b).unwrap();
+
+    let json = serialize::save_game(&t).unwrap();
+    let t2 = serialize::load_game(&json).unwrap();
+
+    // 结构一致
+    assert_eq!(t2.startpos, t.startpos);
+    assert_eq!(t2.root, t.root);
+    assert_eq!(t2.main_line(), vec![t2.root, a, b]);
+    assert_eq!(t2.node(t2.root).unwrap().children, vec![a, v]);
+    assert_eq!(t2.node(a).unwrap().comment, "中炮");
+    assert_eq!(t2.node(a).unwrap().nags, vec![Nag::Good]);
+    assert_eq!(t2.node(v).unwrap().comment, "变例");
+    // 当前节点被恢复（核心要求）
+    assert_eq!(t2.current, b);
+    assert!(!t2.redo_available());
+}
+
+#[test]
+fn load_game_restores_current_to_root_when_saved_at_root() {
+    let mut t = tree();
+    let a = t.insert_move(mv("h2e2")).unwrap();
+    t.insert_move(mv("h7e7")).unwrap();
+    t.set_current(a).unwrap();
+    t.go_to_start().unwrap(); // current = root
+    assert_eq!(t.current, t.root);
+
+    let json = serialize::save_game(&t).unwrap();
+    let t2 = serialize::load_game(&json).unwrap();
+    assert_eq!(t2.current, t2.root);
+}
+
+#[test]
+fn load_game_rejects_illegal_move_without_panic() {
+    // 构造一份含非法着法的存档（d0d1 从空点出发）——必须返回 Err 而不是 panic。
+    let illegal = serde_json::json!({
+        "version": 1,
+        "current": 1,
+        "document": {
+            "version": 1,
+            "startpos": START_FEN,
+            "headers": { "title": "", "red": "", "black": "", "event": "", "date": "", "result": "*" },
+            "root": 0,
+            "nodes": {
+                "0": { "mv": null, "comment": "", "nags": [], "children": [1] },
+                "1": { "mv": "d0d1", "comment": "", "nags": [], "children": [] }
+            }
+        }
+    });
+    let json = serde_json::to_string(&illegal).unwrap();
+    assert!(
+        serialize::load_game(&json).is_err(),
+        "非法着法应返回错误而不是 panic"
+    );
+}

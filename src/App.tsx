@@ -74,6 +74,8 @@ function App() {
   const setNag = useGameStore((state) => state.setNag);
   const toggleVariation = useGameStore((state) => state.toggleVariation);
   const adoptSnapshot = useGameStore((state) => state.adoptSnapshot);
+  const saveGame = useGameStore((state) => state.saveGame);
+  const loadGame = useGameStore((state) => state.loadGame);
 
   // 收集变例节点（GIF「指定变例」来源）
   const variations = useMemo(() => {
@@ -410,6 +412,28 @@ function App() {
 
             {tab === "game" && (
               <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">本地存档</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="game-save"
+                    onClick={() => void saveGame()}
+                  >
+                    保存棋局
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    data-testid="game-load"
+                    onClick={() => void loadGame()}
+                  >
+                    载入棋局
+                  </Button>
+                </div>
+
                 <MoveTree
                   tree={snapshot.tree}
                   currentId={snapshot.currentId}

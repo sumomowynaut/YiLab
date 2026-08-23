@@ -275,13 +275,13 @@ pub fn game_reorder_variation(
 
 // ===================== 引擎分析（Engine Analysis）命令 =====================
 
-use crate::engine::manager::EngineManager;
+use crate::engine::manager::{discover_eval_file, EngineManager};
 use crate::engine::types::{EngineConfig, EngineStatus, GoParams};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 struct EngineInstance {
     mgr: Arc<EngineManager>,
@@ -327,11 +327,18 @@ pub async fn engine_start(program: Option<String>, app: AppHandle) -> Result<Str
         old.forwarder.abort();
     }
 
+    // 自动发现 NNUE 权重（exe 同目录或上一级目录），并把工作目录设为权重所在目录：
+    // 引擎用相对默认值 `pikafish.nnue` 从 cwd 加载，避免传递含中文/空格的绝对路径。
+    let eval_file = discover_eval_file(&PathBuf::from(&program));
+    let cwd = eval_file
+        .as_ref()
+        .and_then(|p| p.parent())
+        .map(|d| d.to_path_buf());
     let config = EngineConfig {
         program: PathBuf::from(program),
         args: Vec::new(),
         env: HashMap::new(),
-        cwd: None,
+        cwd,
         handshake_timeout: Duration::from_secs(10),
     };
     let mgr = Arc::new(EngineManager::spawn(config).await?);
@@ -528,6 +535,14 @@ pub fn io_export(format: String) -> Result<String, String> {
 /// 从图片字节识别局面（视觉模型只识别；棋规校验在本地 Rust 完成）。
 #[tauri::command]
 pub fn ocr_recognize(image: Vec<u8>) -> Result<OcrResultDto, String> {
+    const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024; // 20MB
+    if image.len() > MAX_IMAGE_BYTES {
+        return Err(format!(
+            "image too large: {} bytes (max {} bytes)",
+            image.len(),
+            MAX_IMAGE_BYTES
+        ));
+    }
     let input = crate::ocr::OcrInput { image };
     let engine = crate::ocr::template::TemplateRecognizer::new();
     let output = crate::ocr::recognize(&engine, &input).map_err(|e| e.to_string())?;
@@ -820,6 +835,31 @@ pub fn gif_export_variation(
         show_moves,
     );
     crate::gif_export::export_gif(&req)
+}
+
+// ===================== 当前棋局保存 / 恢复（B3 最小持久化） =====================
+
+/// 保存当前棋局到应用数据目录（固定文件名 current-game.json）。
+#[tauri::command]
+pub fn game_save(app: AppHandle) -> Result<(), String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("current-game.json");
+    let tree = game_tree().lock().map_err(game_err)?;
+    let json = crate::game::serialize::save_game(&tree).map_err(game_err)?;
+    std::fs::write(&path, json).map_err(|e| format!("写入存档失败：{e}"))?;
+    Ok(())
+}
+
+/// 从应用数据目录载入上次保存的棋局（恢复棋谱树 + 当前节点）。
+#[tauri::command]
+pub fn game_load(app: AppHandle) -> Result<GameSnapshot, String> {
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let path = dir.join("current-game.json");
+    let json = std::fs::read_to_string(&path).map_err(|e| format!("未找到存档：{e}"))?;
+    let tree = crate::game::serialize::load_game(&json).map_err(game_err)?;
+    *game_tree().lock().map_err(game_err)? = tree;
+    game_snapshot_dto(&*game_tree().lock().map_err(game_err)?).map_err(game_err)
 }
 
 #[cfg(test)]

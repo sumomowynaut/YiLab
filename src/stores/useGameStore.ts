@@ -29,6 +29,10 @@ interface GameState {
   init: (api: GameApi, boardApi: BoardApi) => Promise<void>;
   /** 采用导入/命令返回的快照（导入导出用）。 */
   adoptSnapshot: (snapshot: GameSnapshot) => void;
+  /** 保存当前棋局到应用数据目录。 */
+  saveGame: () => Promise<void>;
+  /** 从应用数据目录载入上次保存的棋局。 */
+  loadGame: () => Promise<void>;
   handleSquareClick: (sq: Square) => Promise<void>;
   toggleEditing: () => Promise<void>;
   setTool: (tool: Tool) => void;
@@ -92,6 +96,29 @@ export const useGameStore = create<GameState>((set, get) => {
     },
 
     adoptSnapshot: (snapshot) => applySnapshot(snapshot),
+
+    async saveGame() {
+      const { api } = get();
+      if (!api) return;
+      try {
+        await api.save();
+        set({ message: "已保存当前棋局" });
+      } catch (error) {
+        set({ message: String(error) });
+      }
+    },
+
+    async loadGame() {
+      const { api } = get();
+      if (!api) return;
+      try {
+        const snapshot = await api.load();
+        applySnapshot(snapshot);
+        set({ message: "已载入上次保存的棋局" });
+      } catch (error) {
+        set({ message: String(error) });
+      }
+    },
 
     async handleSquareClick(sq) {
       const { api, boardApi, editing, selected, legalTargets, tool } = get();

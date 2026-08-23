@@ -1,13 +1,14 @@
 //! 真实 Pikafish 引擎冒烟测试。
 //!
 //! 默认 `#[ignore]`：需要真实引擎二进制，运行时设置环境变量 `PIKAFISH_BIN` 指向引擎路径。
-//! 例：`PIKAFISH_BIN=...\pikafish.exe cargo test --test pikafish_smoke -- --ignored`
+//! 例：`PIKAFISH_BIN=...\Windows\pikafish-avx2.exe cargo test --test pikafish_smoke -- --ignored`（权重经 discover_eval_file 自动发现；也可用 PIKAFISH_EVALFILE 显式指定）
 //!
 //! 注意：本测试只在本机运行引擎做冒烟验证，不涉及任何分发/捆绑；
 //! 分发相关实现受许可证决策约束（见 docs/licensing.md，当前不做判断）。
 
 use std::time::Duration;
 
+use pikaxiangqi_lib::engine::manager::discover_eval_file;
 use pikaxiangqi_lib::engine::types::{EngineConfig, EngineEvent, EngineStatus, GoParams};
 use pikaxiangqi_lib::engine::EngineManager;
 use tokio::time::timeout;
@@ -17,10 +18,21 @@ use tokio::time::timeout;
 async fn pikafish_handshake_and_analyze() {
     let bin = std::env::var("PIKAFISH_BIN").expect("请设置 PIKAFISH_BIN 指向真实 Pikafish 二进制");
     let bin_path = std::path::PathBuf::from(&bin);
+    // 权重：优先读 PIKAFISH_EVALFILE；否则自动发现（exe 同目录 / 上一级目录）。
+    // 这同时验证了 B1 的「无需手动复制 NNUE」路径。
+    let eval_file = std::env::var("PIKAFISH_EVALFILE")
+        .map(std::path::PathBuf::from)
+        .ok()
+        .or_else(|| discover_eval_file(&bin_path));
+    // 工作目录设为权重所在目录，引擎用相对默认值 `pikafish.nnue` 加载（兼容中文/空格路径）。
     let cwd = std::env::var("PIKAFISH_CWD")
         .map(std::path::PathBuf::from)
         .ok()
-        .or_else(|| bin_path.parent().map(|p| p.to_path_buf()));
+        .or_else(|| {
+            eval_file
+                .as_ref()
+                .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        });
     let config = EngineConfig {
         program: bin_path,
         args: Vec::new(),

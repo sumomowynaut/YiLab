@@ -55,6 +55,8 @@ pub fn run() {
             commands::game_reorder_variation,
             commands::game_set_comment,
             commands::game_set_nag,
+            commands::game_save,
+            commands::game_load,
             commands::board_apply_moves,
             commands::engine_start,
             commands::engine_status,

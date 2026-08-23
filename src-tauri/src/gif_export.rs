@@ -51,7 +51,8 @@ const PALETTE: [[u8; 3]; 8] = [
 
 /// 导出 GIF 字节。
 pub fn export_gif(req: &GifRequest) -> Result<Vec<u8>, String> {
-    let cell = req.cell_size.max(16);
+    // cap board size to avoid huge allocation from abnormal input
+    let cell = req.cell_size.clamp(16, 256);
     let width = 9 * cell + 2 * MARGIN;
     let height = 10 * cell + 2 * MARGIN;
 
@@ -266,6 +267,19 @@ mod tests {
         .expect("export");
         let (_, _, delays) = decode_frames(&bytes);
         assert_eq!(delays[0], 12, "120ms = 12 厘秒");
+    }
+
+    #[test]
+    fn cell_size_is_clamped_to_reasonable_range() {
+        let bytes = export_gif(&GifRequest {
+            cell_size: 100_000, // 应被钳制到上限，而不是导致内存放大
+            ..req(&[])
+        })
+        .expect("export");
+        let (w, h, _) = decode_frames(&bytes);
+        // 上限 256：宽 9*256 + 2*MARGIN
+        assert!(w <= 9 * 256 + 2 * MARGIN as u16, "宽度应被钳制");
+        assert!(h <= 10 * 256 + 2 * MARGIN as u16, "高度应被钳制");
     }
 
     #[test]

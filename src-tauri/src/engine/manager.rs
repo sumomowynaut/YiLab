@@ -4,6 +4,7 @@
 //! - 单任务事件循环：stdout 逐行异步解析，命令经 mpsc 串行化，避免并发写 stdin。
 //! - 处理：启动失败、崩溃（stdout EOF）、停止超时、restart、quit、分析期间切换局面。
 
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -286,6 +287,22 @@ async fn spawn_process(
 
     let (id, options) = handshake(&mut stdin, &mut reader, config.handshake_timeout).await?;
     Ok((child, stdin, reader, id, options))
+}
+
+/// 依据引擎可执行文件路径，自动发现同目录或上一级目录中的 `pikafish.nnue`。
+///
+/// 覆盖两种常见布局：
+/// - 用户把权重与引擎放在同一目录（`exe/pikafish.nnue`）；
+/// - 官方发布包布局（`root/pikafish.nnue` + `root/Windows/pikafish-*.exe`）。
+///
+/// 仅做「文件存在性」探测，返回绝对路径；找不到返回 None（交给引擎自行处理并报错）。
+pub fn discover_eval_file(program: &Path) -> Option<PathBuf> {
+    let exe_dir = program.parent()?;
+    let candidates = [
+        exe_dir.join("pikafish.nnue"),
+        exe_dir.parent()?.join("pikafish.nnue"),
+    ];
+    candidates.into_iter().find(|p| p.is_file())
 }
 
 /// uci → uciok（收集 id/option），isready → readyok。任何超时/EOF 视为启动失败。
@@ -602,5 +619,51 @@ async fn finish_stop(
         None => {
             *status.lock().unwrap_or_else(|e| e.into_inner()) = EngineStatus::Ready;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn discover_eval_file_finds_next_to_exe() {
+        let dir = std::env::temp_dir().join(format!("pika-eval-next-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("pikafish-avx2.exe");
+        let nnue = dir.join("pikafish.nnue");
+        std::fs::write(&exe, b"").unwrap();
+        std::fs::write(&nnue, b"").unwrap();
+
+        assert_eq!(discover_eval_file(&exe), Some(nnue));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn discover_eval_file_finds_in_parent_dir() {
+        let root = std::env::temp_dir().join(format!("pika-eval-parent-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let win = root.join("Windows");
+        std::fs::create_dir_all(&win).unwrap();
+        let exe = win.join("pikafish-avx2.exe");
+        let nnue = root.join("pikafish.nnue");
+        std::fs::write(&exe, b"").unwrap();
+        std::fs::write(&nnue, b"").unwrap();
+
+        assert_eq!(discover_eval_file(&exe), Some(nnue));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn discover_eval_file_returns_none_when_missing() {
+        let dir = std::env::temp_dir().join(format!("pika-eval-none-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("pikafish-avx2.exe");
+        std::fs::write(&exe, b"").unwrap();
+
+        assert_eq!(discover_eval_file(&exe), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
