@@ -249,7 +249,14 @@ export function Board({
     const g = arrowGeometry(sx, sy, tx, ty);
     return (
       <g key={`arrow-${i}`} data-testid={`arrow-${i}`}>
-        <path d={g.line} stroke={a.color} strokeWidth={5} fill="none" opacity={0.55} strokeLinecap="round" />
+        <path
+          d={g.line}
+          stroke={a.color}
+          strokeWidth={5}
+          fill="none"
+          opacity={0.55}
+          strokeLinecap="round"
+        />
         <path d={`M${g.head} Z`} fill={a.color} opacity={0.85} />
         {a.label && (
           <text

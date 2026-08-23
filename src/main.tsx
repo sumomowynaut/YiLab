@@ -4,7 +4,10 @@ import App from "./App";
 import "./index.css";
 
 /** 捕获渲染期错误，避免黑屏/白屏，显示可读错误信息。 */
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: Error | null }
+> {
   state = { error: null as Error | null };
 
   static getDerivedStateFromError(error: Error) {

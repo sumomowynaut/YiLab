@@ -42,8 +42,7 @@ export const tauriBoardApi: BoardApi = {
   legalMoves: (fen) => invokeCommand<string[]>("board_legal_moves", { fen }),
   makeMove: (fen, mv) => invokeCommand<PositionSnapshot>("board_make_move", { fen, mv }),
   applyMoves: (fen, moves) => invokeCommand<PositionSnapshot>("board_apply_moves", { fen, moves }),
-  movesToChinese: (fen, moves) =>
-    invokeCommand<string[]>("board_moves_to_chinese", { fen, moves }),
+  movesToChinese: (fen, moves) => invokeCommand<string[]>("board_moves_to_chinese", { fen, moves }),
   validate: (fen) => invokeCommand<ValidationResult>("board_validate", { fen }),
   rotate: (fen, mode) => invokeCommand<PositionSnapshot>("board_rotate", { fen, mode }),
   setPiece: async (fen, square, color, kind) => {

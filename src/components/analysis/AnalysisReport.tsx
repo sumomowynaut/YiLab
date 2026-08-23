@@ -169,7 +169,8 @@ export function AnalysisReport({
               <ul data-testid="analysis-mistakes" className="list-inside list-disc text-orange-600">
                 {mistakes.map((a, i) => (
                   <li key={a.nodeId}>
-                    第 {i + 1} 步 {a.mvCn || a.mv}（损失 {a.lossCp} cp · {CATEGORY_LABEL[a.category]}）
+                    第 {i + 1} 步 {a.mvCn || a.mv}（损失 {a.lossCp} cp ·{" "}
+                    {CATEGORY_LABEL[a.category]}）
                   </li>
                 ))}
               </ul>
@@ -217,7 +218,10 @@ export function AnalysisReport({
                     <td className={`px-1 py-0.5 ${catClass(a.category)}`}>
                       {CATEGORY_LABEL[a.category]}
                     </td>
-                    <td className="max-w-40 truncate px-1 py-0.5 font-mono" title={(a.pvCn && a.pvCn.length ? a.pvCn : a.pv).join(" ")}>
+                    <td
+                      className="max-w-40 truncate px-1 py-0.5 font-mono"
+                      title={(a.pvCn && a.pvCn.length ? a.pvCn : a.pv).join(" ")}
+                    >
                       {(a.pvCn && a.pvCn.length ? a.pvCn : a.pv).join(" ")}
                     </td>
                   </tr>
