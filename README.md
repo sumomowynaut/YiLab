@@ -71,3 +71,9 @@ npm run tauri build -- --no-bundle   # 仅生成免安装 exe
 ## 许可
 
 引擎（Pikafish）与 NNUE 权重存在独立的许可约束；本软件不内置引擎二进制，引擎由用户自行提供。发布/分发前请阅读 `docs/licensing.md`（非法律意见）。
+# 弈研 YiLab
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+> 个人实验性项目,功能可能不完整,**不提供商用支持**。  
+> 商用方需自行评估并遵守上游 Pikafish 引擎 (GPL-3.0) 与 NNUE 权重的许可约束。
