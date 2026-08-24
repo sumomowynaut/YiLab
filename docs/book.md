@@ -67,10 +67,7 @@ pub trait BookProvider: Send + Sync {
 
 ## 6. 当前版本说明
 
-«文档状态：历史设计方案»
-
-本文档记录 YiLab 曾规划的开局库（Book）架构与实现方案。
-
-当前版本已暂不提供开局库功能。 与开局库相关的 UI、Tauri 命令及运行时功能已从当前版本中移除，因此本文档中的 "BookProvider"、"LocalBookProvider"、"CloudBookProvider"、"BookChain"、"book_lookup"、"book_recommend"、"book_auto_move" 等内容不代表当前版本的实际功能，仅作为历史设计记录保留。
-
-如未来重新实现开局库功能，将以当前项目架构为基础重新评估具体实现方式、数据来源、文件格式及相关授权。
+- «文档状态：历史设计方案»
+- 本文档记录 YiLab 曾规划的开局库（Book）架构与实现方案。
+- 当前版本已暂不提供开局库功能。 与开局库相关的 UI、Tauri 命令及运行时功能已从当前版本中移除，因此本文档中的 "BookProvider"、"LocalBookProvider"、"CloudBookProvider"、"BookChain"、"book_lookup"、"book_recommend"、"book_auto_move" 等内容不代表当前版本的实际功能，仅作为历史设计记录保留。
+-如未来重新实现开局库功能，将以当前项目架构为基础重新评估具体实现方式、数据来源、文件格式及相关授权。
